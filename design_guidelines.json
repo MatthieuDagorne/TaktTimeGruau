@@ -1,0 +1,165 @@
+{
+  "project_name": "TaktTime Industrial",
+  "design_philosophy": {
+    "identity": "E1: The Anti-AI Designer",
+    "theme": "Industrial Dark Mode",
+    "core_principles": [
+      "Legibility at Distance: TV screens must be readable from 10 meters away",
+      "High Contrast: Dark backgrounds with neon/bright accents for status",
+      "Functional Beauty: No unnecessary decoration, every pixel serves data visibility",
+      "Touch Friendly: Controls must be large enough for gloved hands (Back Office on Tablet)"
+    ]
+  },
+  "typography": {
+    "font_family": {
+      "headings": "Chivo, sans-serif",
+      "body": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "scale": {
+      "tv_huge": "text-[15vw] leading-none font-mono tracking-tighter",
+      "tv_large": "text-[8vw] leading-tight font-bold",
+      "h1": "text-4xl md:text-5xl font-bold tracking-tight",
+      "h2": "text-3xl font-semibold tracking-tight",
+      "h3": "text-2xl font-medium",
+      "body": "text-base md:text-lg leading-relaxed",
+      "label": "text-sm font-medium uppercase tracking-wider text-muted-foreground"
+    },
+    "usage": {
+      "headings": "Use 'Chivo' for all section titles and dashboard headers.",
+      "numbers": "Use 'JetBrains Mono' for all timers, counts, and critical metrics.",
+      "body": "Use 'Inter' for configuration forms and general text."
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#0f172a",
+      "surface": "#1e293b",
+      "surface_highlight": "#334155",
+      "border": "#334155",
+      "text": {
+        "primary": "#f8fafc",
+        "secondary": "#94a3b8",
+        "muted": "#64748b"
+      },
+      "status": {
+        "running": {
+          "base": "#22c55e",
+          "bg": "rgba(34, 197, 94, 0.1)",
+          "border": "#4ade80",
+          "text": "#4ade80"
+        },
+        "pause": {
+          "base": "#eab308",
+          "bg": "rgba(234, 179, 8, 0.1)",
+          "border": "#facc15",
+          "text": "#facc15"
+        },
+        "stopped": {
+          "base": "#ef4444",
+          "bg": "rgba(239, 68, 68, 0.1)",
+          "border": "#f87171",
+          "text": "#f87171"
+        },
+        "idle": {
+          "base": "#64748b",
+          "bg": "rgba(100, 116, 139, 0.1)",
+          "border": "#94a3b8",
+          "text": "#94a3b8"
+        }
+      },
+      "accent": "#3b82f6"
+    },
+    "rules": [
+      "Always use dark mode. No light mode toggle.",
+      "Status colors must be vibrant and self-luminous against the dark background.",
+      "Use semi-transparent backgrounds with solid borders for status cards.",
+      "Text on TV screens must be pure white (#ffffff) or high-contrast status color."
+    ]
+  },
+  "layout": {
+    "spacing": {
+      "container_padding": "p-4 md:p-8",
+      "section_gap": "gap-6 md:gap-8",
+      "card_padding": "p-6"
+    },
+    "grid_strategies": {
+      "dashboard": "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+      "tv_display": "flex flex-col h-screen w-screen overflow-hidden p-4 md:p-12 justify-between",
+      "form": "grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6"
+    },
+    "tv_specifics": {
+      "structure": [
+        "Header: Line Name (Top Left), Status Badge (Top Right)",
+        "Center: Massive Countdown Timer (Central Focus)",
+        "Footer: Takt Count (Left), Next Break/Shift End (Right)"
+      ]
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-blue-600 hover:bg-blue-500 text-white rounded-md px-6 py-3 font-medium transition-all shadow-lg hover:shadow-blue-500/20 active:scale-95",
+      "destructive": "bg-red-600 hover:bg-red-500 text-white rounded-md px-6 py-3 font-medium transition-all shadow-lg hover:shadow-red-500/20",
+      "outline": "border-2 border-slate-600 hover:border-slate-500 text-slate-200 hover:bg-slate-800 rounded-md px-6 py-3 transition-all",
+      "control_large": "h-24 text-2xl font-bold uppercase tracking-widest border-2"
+    },
+    "cards": {
+      "style": "bg-slate-800/50 backdrop-blur-sm border border-slate-700 rounded-xl shadow-xl overflow-hidden",
+      "hover": "hover:border-slate-600 transition-colors duration-200"
+    },
+    "inputs": {
+      "style": "bg-slate-900/50 border-slate-700 text-slate-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md h-12 px-4"
+    },
+    "status_indicators": {
+      "style": "inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-md bg-opacity-80",
+    "gradients": "Avoid complex gradients. Use subtle linear gradients for active states: bg-gradient-to-br from-slate-800 to-slate-900.",
+    "shadows": "shadow-lg shadow-black/40",
+    "animations": {
+      "pulse": "animate-pulse",
+      "transition": "transition-all duration-300 ease-out"
+    }
+  },
+  "accessibility": {
+    "contrast": "Ensure 4.5:1 contrast ratio for all text.",
+    "focus": "Visible focus rings (blue-500) for all interactive elements.",
+    "aria": "Use aria-live='polite' for countdown updates to avoid screen reader spam, or 'off' if purely visual."
+  },
+  "assets": {
+    "icons": "Lucide React",
+    "logo": "Use a simple typographic logo or a geometric industrial icon.",
+    "image_urls": {
+        "factory_bg": "https://images.unsplash.com/photo-1769920319160-244e62153b70?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHwyfHxtb2Rlcm4lMjBmYWN0b3J5JTIwcHJvZHVjdGlvbiUyMGxpbmUlMjBpbnRlcmlvciUyMGRhcmt8ZW58MHx8fHwxNzczMjYwNTAwfDA&ixlib=rb-4.1.0&q=85",
+        "industrial_texture": "https://images.unsplash.com/photo-1624178990904-4cce0e510897?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBmYWN0b3J5JTIwcHJvZHVjdGlvbiUyMGxpbmUlMjBpbnRlcmlvciUyMGRhcmt8ZW58MHx8fHwxNzczMjYwNTAwfDA&ixlib=rb-4.1.0&q=85"
+    }
+  },
+  "instructions_to_main_agent": [
+    "1. SETUP: Install fonts 'Chivo' and 'JetBrains Mono' via Google Fonts or Fontsource.",
+    "2. THEME: Enforce dark mode in tailwind.config.js and index.css.",
+    "3. TV PAGE: This is the most critical view. It must be full screen, no scrollbars. Use '100vh'. Text must be massive. Breakpoints: optimize for 1920x1080 (HD TV).",
+    "4. SOUNDS: Implement sound alerts using standard HTML5 Audio. Ensure sounds are loaded and ready. Browsers block auto-play, so ensure a 'Start' interaction enables audio context.",
+    "5. BACK OFFICE: Use a Bento Grid layout for the dashboard list of lines.",
+    "6. COMPONENTS: Use Shadcn UI for the configuration forms but style them to match the Industrial Dark theme (slate-900 backgrounds).",
+    "7. STATE: Use a robust state management (Context or specialized hook) to handle the countdown timer to avoid drift. Sync with backend timestamp, don't just decrement locally without check.",
+    "8. TESTING: Add data-testid to all buttons and inputs."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
+    "You MUST NOT center align the app container, ie do not add .App { text-align: center; } in the css file. This disrupts the human natural reading flow of text",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters like 🤖 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors: separates good from extraordinary.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Components MUST use named exports (export const ComponentName = ...).",
+    "Pages MUST use default exports (export default function PageName() {...}).",
+    "Use 'sonner' for toasts."
+  ]
+}
