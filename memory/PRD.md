@@ -56,10 +56,11 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 - ✅ Hiérarchie Site > Ligne > Écrans TV
 - ✅ Multi-sites avec base commune
 - ✅ **Équipes 1×8/2×8/3×8 avec configurations séparées**
-- ✅ Horaires personnalisés par équipe
-- ✅ **Durée takt configurable par équipe**
-- ✅ Pauses configurables par équipe
-- ✅ **Alertes sonores par équipe (dont alerte avant fin pause)**
+- ✅ **Horaires overnight supportés** (ex: 22:00 - 06:00)
+- ✅ **Durée takt configurable par équipe** (20-40 min)
+- ✅ **Pauses dynamiques** (ajout/suppression, nommées "Pause 1", "Pause 2"...)
+- ✅ **Alertes sonores par équipe** (dont alerte avant fin pause)
+- ✅ **Validation des incohérences** (heure fin < début, pause hors horaires, etc.)
 - ✅ Historique/logs des événements
 - ✅ Statistiques: temps moyen, retards, taux respect
 - ✅ Export CSV (période 1-7 jours)
