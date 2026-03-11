@@ -26,7 +26,7 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 - Statistiques de performance
 
 ## What's Been Implemented ✅
-**Date: 2026-03-11**
+**Date: 2026-03-11 (Mise à jour)**
 
 ### Backend (FastAPI) - v2
 - API REST complète avec CRUD: Sites, Lignes, Écrans TV
@@ -35,30 +35,39 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 - WebSocket pour mises à jour temps réel
 - Calcul automatique du nombre de takts estimés
 - Logging automatique des événements (start/pause/stop/next)
+- **BUG FIX**: Temps écoulé conservé lors de pause/reprise
 
 ### Frontend (React)
 - **Dashboard**: Liste des lignes, filtrage par site, boutons Sites/Statistiques
 - **Sites Management**: CRUD des sites de production
 - **Screens Management**: CRUD des écrans TV avec IP et position
-- **Configuration**: Formulaire complet avec horaires par jour (Lun-Dim), équipes
+- **Configuration Équipes**: 
+  - Organisation 1×8/2×8/3×8 avec équipes configurables séparément
+  - Chaque équipe a ses propres: horaires, durée takt, pauses, alertes sonores
+  - Dialogue d'édition complet avec tous les paramètres
+  - **Alerte avant fin pause** présente dans le dialogue
 - **Statistics**: Cartes KPI, tableau événements, export CSV
 - **Écran TV**: Affichage plein écran grand format
+- **Sons industriels**: Beeps/horns adaptés environnement automobile
 - Design industriel sombre responsive
-- Alertes sonores via Web Audio API
+- **Passage auto au takt suivant** quand option activée
 
 ### Features Implémentées
 - ✅ Hiérarchie Site > Ligne > Écrans TV
 - ✅ Multi-sites avec base commune
-- ✅ Équipes 1×8/2×8/3×8
-- ✅ Horaires personnalisés par jour (vendredi plus court)
-- ✅ Configuration des pauses
-- ✅ Alertes sonores
+- ✅ **Équipes 1×8/2×8/3×8 avec configurations séparées**
+- ✅ Horaires personnalisés par équipe
+- ✅ **Durée takt configurable par équipe**
+- ✅ Pauses configurables par équipe
+- ✅ **Alertes sonores par équipe (dont alerte avant fin pause)**
 - ✅ Historique/logs des événements
 - ✅ Statistiques: temps moyen, retards, taux respect
 - ✅ Export CSV (période 1-7 jours)
 - ✅ Gestion des écrans TV (nom, IP, position)
 - ✅ Affichage TV plein écran
-- ✅ Contrôles: démarrer/suspendre/arrêter/suivant
+- ✅ **Passage automatique au takt suivant**
+- ✅ **Sons industriels automobiles**
+- ✅ **Bug fix: temps conservé pause/reprise**
 
 ## Prioritized Backlog
 
