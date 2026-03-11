@@ -66,6 +66,16 @@ const LineCard = ({ line, onDelete }) => {
   const { startTakt, pauseTakt, stopTakt, nextTakt, enableAudio, playSound } = useTakt();
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const handleAutoNext = async () => {
+    if (line?.auto_resume_after_takt) {
+      try {
+        await nextTakt(line.id);
+      } catch (err) {
+        console.error('Auto-next failed:', err);
+      }
+    }
+  };
+
   const { 
     elapsedFormatted, 
     remainingFormatted, 
@@ -73,9 +83,12 @@ const LineCard = ({ line, onDelete }) => {
     status,
     currentTakt,
     estimatedTakts,
-  } = useTaktTimer(line, 
+    isOvertime,
+  } = useTaktTimer(
+    line, 
     () => playSound('takt_warning'),
-    () => playSound('takt_end')
+    () => playSound('takt_end'),
+    handleAutoNext
   );
 
   const handleStart = async () => {
@@ -130,7 +143,7 @@ const LineCard = ({ line, onDelete }) => {
             </div>
             <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-700">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Restant</p>
-              <p className="text-lg font-mono font-bold text-green-400" data-testid="remaining-time">
+              <p className={`text-lg font-mono font-bold ${isOvertime ? 'text-red-400' : 'text-green-400'}`} data-testid="remaining-time">
                 {remainingFormatted}
               </p>
             </div>
@@ -140,8 +153,10 @@ const LineCard = ({ line, onDelete }) => {
           <div className="space-y-1">
             <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-1000"
-                style={{ width: `${progressPercentage}%` }}
+                className={`h-full rounded-full transition-all duration-1000 ${
+                  isOvertime ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-cyan-400'
+                }`}
+                style={{ width: `${Math.min(100, progressPercentage)}%` }}
               />
             </div>
             <div className="flex justify-between text-[10px] text-slate-500">

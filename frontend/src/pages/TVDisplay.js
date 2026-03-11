@@ -62,6 +62,17 @@ export default function TVDisplay() {
     }
   }, [audioEnabled, line, playSound]);
 
+  const handleAutoNext = useCallback(async () => {
+    if (line?.auto_resume_after_takt) {
+      try {
+        await nextTakt(lineId);
+        await loadLine();
+      } catch (err) {
+        console.error('Auto-next failed:', err);
+      }
+    }
+  }, [line, lineId, nextTakt]);
+
   const { 
     elapsedFormatted, 
     remainingFormatted, 
@@ -70,7 +81,7 @@ export default function TVDisplay() {
     currentTakt,
     estimatedTakts,
     isOvertime,
-  } = useTaktTimer(line, handleWarning, handleComplete);
+  } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext);
 
   useEffect(() => {
     loadLine();

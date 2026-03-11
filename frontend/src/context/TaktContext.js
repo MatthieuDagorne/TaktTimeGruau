@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { soundManager } from '@/hooks/useIndustrialSound';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -22,92 +23,15 @@ export const TaktProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const wsConnections = useRef({});
-  const audioContext = useRef(null);
-  const audioEnabled = useRef(false);
 
-  // Initialize audio context on user interaction
+  // Initialize sound on user interaction
   const enableAudio = useCallback(() => {
-    if (!audioContext.current) {
-      audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (audioContext.current.state === 'suspended') {
-      audioContext.current.resume();
-    }
-    audioEnabled.current = true;
+    soundManager.enable();
   }, []);
 
-  // Play sound alert
+  // Play sound alert using industrial sound manager
   const playSound = useCallback((type) => {
-    if (!audioEnabled.current || !audioContext.current) return;
-    
-    const ctx = audioContext.current;
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
-    
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    switch (type) {
-      case 'takt_start':
-        oscillator.frequency.value = 880;
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 0.5);
-        break;
-      case 'takt_warning':
-        oscillator.frequency.value = 660;
-        oscillator.type = 'triangle';
-        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 0.3);
-        setTimeout(() => {
-          const osc2 = ctx.createOscillator();
-          const gain2 = ctx.createGain();
-          osc2.connect(gain2);
-          gain2.connect(ctx.destination);
-          osc2.frequency.value = 660;
-          osc2.type = 'triangle';
-          gain2.gain.setValueAtTime(0.3, ctx.currentTime);
-          gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-          osc2.start(ctx.currentTime);
-          osc2.stop(ctx.currentTime + 0.3);
-        }, 400);
-        break;
-      case 'takt_end':
-        oscillator.frequency.value = 440;
-        oscillator.type = 'square';
-        gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 1);
-        break;
-      case 'break_start':
-        oscillator.frequency.value = 523;
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 0.8);
-        break;
-      case 'break_end':
-        oscillator.frequency.value = 784;
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 0.5);
-        break;
-      default:
-        oscillator.frequency.value = 600;
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-        oscillator.start(ctx.currentTime);
-        oscillator.stop(ctx.currentTime + 0.3);
-    }
+    soundManager.play(type);
   }, []);
 
   // ==================== SITES ====================

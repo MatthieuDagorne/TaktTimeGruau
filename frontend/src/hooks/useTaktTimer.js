@@ -1,25 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-export const useTaktTimer = (line, onWarning, onComplete) => {
+export const useTaktTimer = (line, onWarning, onComplete, onAutoNext) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const intervalRef = useRef(null);
   const warningTriggered = useRef(false);
   const completeTriggered = useRef(false);
+  const autoNextTriggered = useRef(false);
 
   const taktDurationSeconds = line?.takt_duration ? line.takt_duration * 60 : 0;
   const state = line?.state || {};
   const status = state.status || 'idle';
+  const autoResumeAfterTakt = line?.auto_resume_after_takt ?? true;
 
   const calculateElapsed = useCallback(() => {
     if (!state.takt_start_time || status === 'idle') {
-      return state.elapsed_seconds || 0;
+      return 0;
     }
 
+    // When paused or on break, return the stored elapsed_seconds
     if (status === 'paused' || status === 'break') {
       return state.elapsed_seconds || 0;
     }
 
+    // When running, calculate elapsed from takt_start_time + base elapsed_seconds
     if (status === 'running') {
       const startTime = new Date(state.takt_start_time).getTime();
       const now = Date.now();
@@ -29,7 +33,7 @@ export const useTaktTimer = (line, onWarning, onComplete) => {
     }
 
     return state.elapsed_seconds || 0;
-  }, [state, status]);
+  }, [state.takt_start_time, state.elapsed_seconds, status]);
 
   useEffect(() => {
     // Clear previous interval
@@ -41,6 +45,7 @@ export const useTaktTimer = (line, onWarning, onComplete) => {
     if (state.current_takt !== warningTriggered.current?.takt) {
       warningTriggered.current = { takt: state.current_takt, triggered: false };
       completeTriggered.current = { takt: state.current_takt, triggered: false };
+      autoNextTriggered.current = { takt: state.current_takt, triggered: false };
     }
 
     const updateTimer = () => {
@@ -73,6 +78,21 @@ export const useTaktTimer = (line, onWarning, onComplete) => {
         completeTriggered.current = { takt: state.current_takt, triggered: true };
         onComplete();
       }
+
+      // Auto-advance to next takt if option is enabled
+      if (
+        status === 'running' &&
+        remaining <= 0 &&
+        autoResumeAfterTakt &&
+        !autoNextTriggered.current?.triggered &&
+        onAutoNext
+      ) {
+        autoNextTriggered.current = { takt: state.current_takt, triggered: true };
+        // Small delay to let the completion sound play
+        setTimeout(() => {
+          onAutoNext();
+        }, 1500);
+      }
     };
 
     // Initial update
@@ -88,32 +108,37 @@ export const useTaktTimer = (line, onWarning, onComplete) => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [line, status, state, taktDurationSeconds, calculateElapsed, onWarning, onComplete]);
+  }, [line, status, state.current_takt, state.takt_start_time, state.elapsed_seconds, taktDurationSeconds, calculateElapsed, onWarning, onComplete, onAutoNext, autoResumeAfterTakt]);
 
   const formatTime = useCallback((totalSeconds) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+    const isNegative = totalSeconds < 0;
+    const absSeconds = Math.abs(totalSeconds);
+    const hours = Math.floor(absSeconds / 3600);
+    const minutes = Math.floor((absSeconds % 3600) / 60);
+    const seconds = absSeconds % 60;
 
+    const prefix = isNegative ? '-' : '';
     if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      return `${prefix}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     }
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    return `${prefix}${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, []);
 
   const progressPercentage = taktDurationSeconds > 0 
     ? Math.min(100, (elapsedSeconds / taktDurationSeconds) * 100)
     : 0;
 
+  const isOvertime = elapsedSeconds > taktDurationSeconds && taktDurationSeconds > 0;
+
   return {
     elapsedSeconds,
-    remainingSeconds,
+    remainingSeconds: isOvertime ? -(elapsedSeconds - taktDurationSeconds) : remainingSeconds,
     elapsedFormatted: formatTime(elapsedSeconds),
-    remainingFormatted: formatTime(remainingSeconds),
+    remainingFormatted: formatTime(isOvertime ? -(elapsedSeconds - taktDurationSeconds) : remainingSeconds),
     progressPercentage,
     status,
     currentTakt: state.current_takt || 0,
     estimatedTakts: line?.estimated_takts || 0,
-    isOvertime: elapsedSeconds > taktDurationSeconds,
+    isOvertime,
   };
 };

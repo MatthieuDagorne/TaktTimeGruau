@@ -105,7 +105,35 @@ class WeeklySchedule(BaseModel):
     saturday: DaySchedule = Field(default_factory=lambda: DaySchedule(is_working_day=False))
     sunday: DaySchedule = Field(default_factory=lambda: DaySchedule(is_working_day=False))
 
-# Team/Shift Configuration
+# Team/Shift Configuration - Each team has its own complete settings
+class TeamShift(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = "Équipe Matin"
+    day_start: str = "06:00"
+    day_end: str = "14:00"
+    takt_duration: int = 30  # Each team can have different takt duration
+    breaks: List[Dict] = Field(default_factory=lambda: [
+        {"name": "Pause Matin", "start_time": "09:00", "duration": 15},
+        {"name": "Pause Midi", "start_time": "12:00", "duration": 30}
+    ])
+    sound_alerts: Dict = Field(default_factory=lambda: {
+        "takt_start": True,
+        "minutes_before_takt_end": 5,
+        "takt_end": True,
+        "break_start": True,
+        "minutes_before_break_end": 5,
+        "break_end": True
+    })
+    is_active: bool = True
+
+class ShiftOrganization(BaseModel):
+    type: str = "1x8"  # 1x8, 2x8, 3x8
+    teams: List[TeamShift] = Field(default_factory=lambda: [
+        TeamShift(name="Équipe Standard", day_start="08:00", day_end="17:00")
+    ])
+    active_team_id: Optional[str] = None  # Currently active team
+
+# Legacy TeamConfig for backward compatibility
 class TeamConfig(BaseModel):
     name: str = "Équipe Standard"
     shift_type: str = "1x8"  # 1x8, 2x8, 3x8
@@ -137,8 +165,9 @@ class TaktState(BaseModel):
 class ProductionLineBase(BaseModel):
     name: str
     site_id: str = ""
-    takt_duration: int = 30
-    team_config: TeamConfig = Field(default_factory=TeamConfig)
+    takt_duration: int = 30  # Default takt duration (can be overridden per team)
+    team_config: TeamConfig = Field(default_factory=TeamConfig)  # Legacy
+    shift_organization: ShiftOrganization = Field(default_factory=ShiftOrganization)  # New multi-team support
     breaks: List[BreakConfig] = Field(default_factory=lambda: [
         BreakConfig(name="Pause Matin", start_time="10:00", duration=15),
         BreakConfig(name="Pause Midi", start_time="12:00", duration=60),
@@ -156,6 +185,7 @@ class ProductionLineUpdate(BaseModel):
     site_id: Optional[str] = None
     takt_duration: Optional[int] = None
     team_config: Optional[TeamConfig] = None
+    shift_organization: Optional[ShiftOrganization] = None
     breaks: Optional[List[BreakConfig]] = None
     auto_resume_after_break: Optional[bool] = None
     auto_resume_after_takt: Optional[bool] = None
@@ -475,13 +505,16 @@ async def start_takt(line_id: str):
     current_status = state.get('status', 'idle')
     now = datetime.now(timezone.utc)
     
-    if current_status == 'paused':
+    if current_status == 'paused' or current_status == 'break':
+        # When resuming, set takt_start_time to NOW and keep elapsed_seconds as the base
         new_state = {
             "status": "running",
             "current_takt": state.get('current_takt', 1),
-            "takt_start_time": state.get('takt_start_time', now.isoformat()),
-            "elapsed_seconds": state.get('elapsed_seconds', 0),
-            "paused_at": None
+            "takt_start_time": now.isoformat(),  # Reset to now for correct calculation
+            "elapsed_seconds": state.get('elapsed_seconds', 0),  # Keep accumulated time
+            "paused_at": None,
+            "current_break_name": None,
+            "break_end_time": None
         }
         await log_takt_event(line_id, line.get('site_id', ''), 'takt_resume', state.get('current_takt', 1))
     else:
