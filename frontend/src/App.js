@@ -12,8 +12,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/config/:lineId" element={<LineConfig />} />
           <Route path="/config/new" element={<LineConfig />} />
+          <Route path="/config/:lineId" element={<LineConfig />} />
           <Route path="/tv/:lineId" element={<TVDisplay />} />
         </Routes>
         <Toaster position="top-right" richColors />

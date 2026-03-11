@@ -25,9 +25,9 @@ export default function LineConfig() {
   const { lineId } = useParams();
   const navigate = useNavigate();
   const { fetchLine, createLine, updateLine } = useTakt();
-  const isNew = lineId === 'new';
+  const isNew = !lineId || lineId === 'new';
 
-  const [loading, setLoading] = useState(!isNew);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -55,6 +55,7 @@ export default function LineConfig() {
 
   useEffect(() => {
     if (!isNew && lineId) {
+      setLoading(true);
       loadLine();
     }
   }, [lineId, isNew]);
