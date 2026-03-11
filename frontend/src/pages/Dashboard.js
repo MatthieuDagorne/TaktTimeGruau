@@ -12,23 +12,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
   Play,
   Pause,
   Square,
   Settings,
   Tv,
   Plus,
-  Trash2,
   Factory,
   Clock,
   Timer,
@@ -61,10 +50,9 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const LineCard = ({ line, onDelete }) => {
+const LineCard = ({ line }) => {
   const navigate = useNavigate();
   const { startTakt, pauseTakt, stopTakt, nextTakt, enableAudio, playSound } = useTakt();
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleAutoNext = async () => {
     if (line?.auto_resume_after_takt) {
@@ -265,37 +253,16 @@ const LineCard = ({ line, onDelete }) => {
             <Button 
               variant="ghost" 
               size="sm"
-              className="h-8 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/20"
-              onClick={() => setIsDeleting(true)}
-              data-testid="delete-btn"
+              className="flex-1 h-8 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700 px-2"
+              onClick={() => navigate(`/statistics/${line.id}`)}
+              data-testid="stats-btn"
             >
-              <Trash2 className="h-3 w-3" />
+              <BarChart3 className="h-3 w-3 mr-1" />
+              Stats
             </Button>
           </div>
         </CardContent>
       </Card>
-
-      <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
-        <AlertDialogContent className="bg-slate-800 border-slate-700">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-slate-100">Supprimer la ligne ?</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">
-              Cette action supprimera définitivement la ligne "{line.name}" et tous ses paramètres.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-700 text-slate-200 border-slate-600 hover:bg-slate-600">
-              Annuler
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => onDelete(line.id)}
-              className="bg-red-600 hover:bg-red-500 text-white"
-            >
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 };

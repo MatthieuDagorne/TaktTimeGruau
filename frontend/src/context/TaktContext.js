@@ -142,6 +142,7 @@ export const TaktProvider = ({ children }) => {
   const startTakt = useCallback(async (lineId) => {
     const response = await axios.post(`${API}/lines/${lineId}/start`);
     await fetchLines();
+    // Play sound for both start and resume
     playSound('takt_start');
     return response.data;
   }, [fetchLines, playSound]);

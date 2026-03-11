@@ -613,31 +613,16 @@ export default function LineConfig() {
             {/* Shift Organization */}
             <Card className="bg-slate-800/50 border-slate-700">
               <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-500/20">
-                      <Users className="h-5 w-5 text-purple-400" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg text-slate-100">Organisation des équipes</CardTitle>
-                      <CardDescription className="text-slate-400">
-                        Configurez les équipes et leurs horaires
-                      </CardDescription>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/20">
+                    <Users className="h-5 w-5 text-purple-400" />
                   </div>
-                  <Select 
-                    value={formData.shift_organization.type}
-                    onValueChange={handleShiftTypeChange}
-                  >
-                    <SelectTrigger className="w-[140px] bg-slate-900/50 border-slate-700 text-slate-100">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-700">
-                      <SelectItem value="1x8">1×8 (1 équipe)</SelectItem>
-                      <SelectItem value="2x8">2×8 (2 équipes)</SelectItem>
-                      <SelectItem value="3x8">3×8 (3 équipes)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div>
+                    <CardTitle className="text-lg text-slate-100">Organisation des équipes</CardTitle>
+                    <CardDescription className="text-slate-400">
+                      Configurez les équipes et leurs horaires
+                    </CardDescription>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
