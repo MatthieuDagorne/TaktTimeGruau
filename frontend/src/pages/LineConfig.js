@@ -22,7 +22,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Alert,
+  AlertDescription,
+} from '@/components/ui/alert';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -39,18 +44,113 @@ import {
   Edit,
   Trash2,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
+
+// Utility functions for time validation
+const timeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const minutesToTime = (minutes) => {
+  const h = Math.floor(minutes / 60) % 24;
+  const m = minutes % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+};
+
+const isTimeInRange = (time, start, end) => {
+  const t = timeToMinutes(time);
+  const s = timeToMinutes(start);
+  const e = timeToMinutes(end);
+  
+  // Handle overnight shifts (e.g., 22:00 - 06:00)
+  if (e < s) {
+    return t >= s || t <= e;
+  }
+  return t >= s && t <= e;
+};
+
+const validateTeam = (team) => {
+  const errors = [];
+  const warnings = [];
+  
+  const startMin = timeToMinutes(team.day_start);
+  const endMin = timeToMinutes(team.day_end);
+  
+  // Check start/end coherence
+  if (startMin === endMin) {
+    errors.push("L'heure de début et de fin ne peuvent pas être identiques");
+  }
+  
+  // Calculate working duration (handle overnight)
+  let workDuration = endMin - startMin;
+  if (workDuration < 0) {
+    workDuration += 24 * 60; // Overnight shift
+  }
+  
+  if (workDuration < 60) {
+    errors.push("La durée de travail doit être d'au moins 1 heure");
+  }
+  
+  // Validate takt duration
+  if (team.takt_duration < 20 || team.takt_duration > 40) {
+    errors.push("La durée du takt doit être entre 20 et 40 minutes");
+  }
+  
+  // Validate breaks
+  let totalBreakDuration = 0;
+  team.breaks.forEach((brk, index) => {
+    const breakNum = index + 1;
+    
+    if (brk.duration < 0) {
+      errors.push(`Pause ${breakNum}: la durée ne peut pas être négative`);
+    }
+    
+    if (brk.duration > 120) {
+      warnings.push(`Pause ${breakNum}: durée supérieure à 2 heures`);
+    }
+    
+    if (brk.start_time) {
+      const breakStart = timeToMinutes(brk.start_time);
+      const breakEnd = breakStart + brk.duration;
+      
+      // Check if break is within working hours
+      if (!isTimeInRange(brk.start_time, team.day_start, team.day_end)) {
+        errors.push(`Pause ${breakNum}: l'heure de début (${brk.start_time}) est en dehors des heures de travail`);
+      }
+      
+      // Check if break end is within working hours
+      const breakEndTime = minutesToTime(breakEnd);
+      if (brk.duration > 0 && !isTimeInRange(breakEndTime, team.day_start, team.day_end)) {
+        warnings.push(`Pause ${breakNum}: se termine après la fin du travail`);
+      }
+    }
+    
+    totalBreakDuration += brk.duration || 0;
+  });
+  
+  // Check if breaks don't exceed work time
+  if (totalBreakDuration >= workDuration) {
+    errors.push("Le temps total des pauses dépasse ou égale le temps de travail");
+  }
+  
+  // Check if there's enough time for at least one takt
+  const netWorkTime = workDuration - totalBreakDuration;
+  if (netWorkTime < team.takt_duration) {
+    errors.push("Le temps de travail net est insuffisant pour un seul takt");
+  }
+  
+  return { errors, warnings, isValid: errors.length === 0 };
+};
 
 const defaultTeam = {
   name: '',
   day_start: '08:00',
   day_end: '17:00',
   takt_duration: 30,
-  breaks: [
-    { name: 'Pause Matin', start_time: '10:00', duration: 15 },
-    { name: 'Pause Midi', start_time: '12:00', duration: 60 },
-    { name: 'Pause Après-midi', start_time: '15:00', duration: 15 },
-  ],
+  breaks: [], // Start with no breaks, user adds as needed
   sound_alerts: {
     takt_start: true,
     minutes_before_takt_end: 5,
@@ -61,6 +161,12 @@ const defaultTeam = {
   },
   is_active: true,
 };
+
+const createDefaultBreak = (index) => ({
+  name: `Pause ${index + 1}`,
+  start_time: '',
+  duration: 15,
+});
 
 export default function LineConfig() {
   const { lineId } = useParams();
@@ -73,6 +179,7 @@ export default function LineConfig() {
   const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState(null);
   const [editingTeamIndex, setEditingTeamIndex] = useState(-1);
+  const [teamValidation, setTeamValidation] = useState({ errors: [], warnings: [], isValid: true });
 
   const [formData, setFormData] = useState({
     name: '',
@@ -88,9 +195,8 @@ export default function LineConfig() {
           day_end: '17:00',
           takt_duration: 30,
           breaks: [
-            { name: 'Pause Matin', start_time: '10:00', duration: 15 },
-            { name: 'Pause Midi', start_time: '12:00', duration: 60 },
-            { name: 'Pause Après-midi', start_time: '15:00', duration: 15 },
+            { name: 'Pause 1', start_time: '10:00', duration: 15 },
+            { name: 'Pause 2', start_time: '12:00', duration: 60 },
           ],
           sound_alerts: {
             takt_start: true,
@@ -117,14 +223,26 @@ export default function LineConfig() {
     }
   }, [lineId, isNew, fetchSites]);
 
+  // Validate editing team when it changes
+  useEffect(() => {
+    if (editingTeam) {
+      setTeamValidation(validateTeam(editingTeam));
+    }
+  }, [editingTeam]);
+
   const loadLine = async () => {
     try {
       const data = await fetchLine(lineId);
       
-      // Handle legacy data structure
       let shiftOrg = data.shift_organization;
       if (!shiftOrg || !shiftOrg.teams || shiftOrg.teams.length === 0) {
-        // Convert legacy format to new format
+        // Convert legacy format - rename breaks to Pause 1, 2, 3
+        const legacyBreaks = (data.breaks || []).map((b, i) => ({
+          name: `Pause ${i + 1}`,
+          start_time: b.start_time || '',
+          duration: b.duration || 0,
+        }));
+        
         shiftOrg = {
           type: data.team_config?.shift_type || '1x8',
           teams: [{
@@ -133,12 +251,21 @@ export default function LineConfig() {
             day_start: data.team_config?.weekly_schedule?.monday?.day_start || '08:00',
             day_end: data.team_config?.weekly_schedule?.monday?.day_end || '17:00',
             takt_duration: data.takt_duration || 30,
-            breaks: data.breaks || defaultTeam.breaks,
+            breaks: legacyBreaks,
             sound_alerts: data.sound_alerts || defaultTeam.sound_alerts,
             is_active: true,
           }],
           active_team_id: null,
         };
+      } else {
+        // Ensure breaks have proper names
+        shiftOrg.teams = shiftOrg.teams.map(team => ({
+          ...team,
+          breaks: (team.breaks || []).map((b, i) => ({
+            ...b,
+            name: `Pause ${i + 1}`,
+          })),
+        }));
       }
 
       setFormData({
@@ -159,10 +286,13 @@ export default function LineConfig() {
 
   const calculateTeamTakts = useCallback((team) => {
     try {
-      const [startH, startM] = (team.day_start || '08:00').split(':').map(Number);
-      const [endH, endM] = (team.day_end || '17:00').split(':').map(Number);
+      const startMin = timeToMinutes(team.day_start);
+      const endMin = timeToMinutes(team.day_end);
       
-      let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+      let totalMinutes = endMin - startMin;
+      if (totalMinutes < 0) {
+        totalMinutes += 24 * 60; // Overnight shift
+      }
       
       (team.breaks || []).forEach(b => {
         if (b.duration > 0) {
@@ -190,14 +320,21 @@ export default function LineConfig() {
       return;
     }
 
+    // Validate all teams before saving
+    for (const team of formData.shift_organization.teams) {
+      const validation = validateTeam(team);
+      if (!validation.isValid) {
+        toast.error(`Équipe "${team.name}": ${validation.errors[0]}`);
+        return;
+      }
+    }
+
     setSaving(true);
     try {
-      // Set active team to first team if not set
       const dataToSave = { ...formData };
       if (!dataToSave.shift_organization.active_team_id) {
         dataToSave.shift_organization.active_team_id = dataToSave.shift_organization.teams[0]?.id;
       }
-      // Use first team's takt_duration as default
       dataToSave.takt_duration = dataToSave.shift_organization.teams[0]?.takt_duration || 30;
 
       if (isNew) {
@@ -219,32 +356,42 @@ export default function LineConfig() {
     const currentTeams = formData.shift_organization.teams;
     let newTeams = [...currentTeams];
 
-    if (type === '1x8' && newTeams.length > 1) {
-      newTeams = [newTeams[0]];
-    } else if (type === '2x8' && newTeams.length < 2) {
+    const createTeamForShift = (index, shiftType) => {
+      const configs = {
+        '1x8': [{ name: 'Équipe Standard', start: '08:00', end: '17:00' }],
+        '2x8': [
+          { name: 'Équipe Matin', start: '06:00', end: '14:00' },
+          { name: 'Équipe Après-midi', start: '14:00', end: '22:00' },
+        ],
+        '3x8': [
+          { name: 'Équipe Matin', start: '06:00', end: '14:00' },
+          { name: 'Équipe Après-midi', start: '14:00', end: '22:00' },
+          { name: 'Équipe Nuit', start: '22:00', end: '06:00' },
+        ],
+      };
+      const config = configs[shiftType]?.[index] || configs['1x8'][0];
+      return {
+        ...defaultTeam,
+        id: crypto.randomUUID(),
+        name: config.name,
+        day_start: config.start,
+        day_end: config.end,
+        breaks: [createDefaultBreak(0)], // One default break
+      };
+    };
+
+    if (type === '1x8') {
+      newTeams = [newTeams[0] || createTeamForShift(0, '1x8')];
+    } else if (type === '2x8') {
       while (newTeams.length < 2) {
-        newTeams.push({
-          ...defaultTeam,
-          id: crypto.randomUUID(),
-          name: newTeams.length === 0 ? 'Équipe Matin' : 'Équipe Après-midi',
-          day_start: newTeams.length === 0 ? '06:00' : '14:00',
-          day_end: newTeams.length === 0 ? '14:00' : '22:00',
-        });
+        newTeams.push(createTeamForShift(newTeams.length, '2x8'));
       }
-    } else if (type === '3x8' && newTeams.length < 3) {
+      if (newTeams.length > 2) newTeams = newTeams.slice(0, 2);
+    } else if (type === '3x8') {
       while (newTeams.length < 3) {
-        const teamNum = newTeams.length;
-        const names = ['Équipe Matin', 'Équipe Après-midi', 'Équipe Nuit'];
-        const starts = ['06:00', '14:00', '22:00'];
-        const ends = ['14:00', '22:00', '06:00'];
-        newTeams.push({
-          ...defaultTeam,
-          id: crypto.randomUUID(),
-          name: names[teamNum] || `Équipe ${teamNum + 1}`,
-          day_start: starts[teamNum] || '06:00',
-          day_end: ends[teamNum] || '14:00',
-        });
+        newTeams.push(createTeamForShift(newTeams.length, '3x8'));
       }
+      if (newTeams.length > 3) newTeams = newTeams.slice(0, 3);
     }
 
     setFormData(prev => ({
@@ -259,13 +406,22 @@ export default function LineConfig() {
 
   const openTeamDialog = (team = null, index = -1) => {
     if (team) {
-      setEditingTeam({ ...team });
+      // Ensure breaks have proper names
+      const teamWithNamedBreaks = {
+        ...team,
+        breaks: (team.breaks || []).map((b, i) => ({
+          ...b,
+          name: `Pause ${i + 1}`,
+        })),
+      };
+      setEditingTeam(teamWithNamedBreaks);
       setEditingTeamIndex(index);
     } else {
       setEditingTeam({
         ...defaultTeam,
         id: crypto.randomUUID(),
         name: `Équipe ${formData.shift_organization.teams.length + 1}`,
+        breaks: [createDefaultBreak(0)],
       });
       setEditingTeamIndex(-1);
     }
@@ -278,11 +434,26 @@ export default function LineConfig() {
       return;
     }
 
+    const validation = validateTeam(editingTeam);
+    if (!validation.isValid) {
+      toast.error(validation.errors[0]);
+      return;
+    }
+
+    // Renumber breaks before saving
+    const teamToSave = {
+      ...editingTeam,
+      breaks: editingTeam.breaks.map((b, i) => ({
+        ...b,
+        name: `Pause ${i + 1}`,
+      })),
+    };
+
     const newTeams = [...formData.shift_organization.teams];
     if (editingTeamIndex >= 0) {
-      newTeams[editingTeamIndex] = editingTeam;
+      newTeams[editingTeamIndex] = teamToSave;
     } else {
-      newTeams.push(editingTeam);
+      newTeams.push(teamToSave);
     }
 
     setFormData(prev => ({
@@ -321,6 +492,24 @@ export default function LineConfig() {
         active_team_id: teamId,
       },
     }));
+  };
+
+  // Break management functions
+  const addBreak = () => {
+    if (!editingTeam) return;
+    const newBreaks = [...editingTeam.breaks, createDefaultBreak(editingTeam.breaks.length)];
+    setEditingTeam({ ...editingTeam, breaks: newBreaks });
+  };
+
+  const removeBreak = (index) => {
+    if (!editingTeam) return;
+    const newBreaks = editingTeam.breaks.filter((_, i) => i !== index);
+    // Renumber remaining breaks
+    const renamedBreaks = newBreaks.map((b, i) => ({
+      ...b,
+      name: `Pause ${i + 1}`,
+    }));
+    setEditingTeam({ ...editingTeam, breaks: renamedBreaks });
   };
 
   const updateEditingTeamBreak = (index, field, value) => {
@@ -491,6 +680,7 @@ export default function LineConfig() {
                             size="sm"
                             onClick={() => openTeamDialog(team, index)}
                             className="text-slate-400 hover:text-slate-100 h-8"
+                            data-testid={`edit-team-${index}`}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -518,7 +708,7 @@ export default function LineConfig() {
                         </div>
                         <div className="flex items-center gap-2 text-slate-400">
                           <Coffee className="h-4 w-4" />
-                          <span>{team.breaks.reduce((a, b) => a + (b.duration || 0), 0)} min pauses</span>
+                          <span>{team.breaks?.length || 0} pause(s)</span>
                         </div>
                         <div className="flex items-center gap-2 text-cyan-400">
                           <Calculator className="h-4 w-4" />
@@ -624,10 +814,40 @@ export default function LineConfig() {
             <DialogTitle className="text-slate-100">
               {editingTeamIndex >= 0 ? "Modifier l'équipe" : 'Nouvelle équipe'}
             </DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Configurez les horaires, pauses et alertes de l'équipe
+            </DialogDescription>
           </DialogHeader>
           
           {editingTeam && (
             <div className="space-y-6">
+              {/* Validation Errors */}
+              {teamValidation.errors.length > 0 && (
+                <Alert variant="destructive" className="bg-red-500/10 border-red-500/50">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <ul className="list-disc list-inside text-sm">
+                      {teamValidation.errors.map((err, i) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {teamValidation.warnings.length > 0 && (
+                <Alert className="bg-yellow-500/10 border-yellow-500/50">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <AlertDescription className="text-yellow-200">
+                    <ul className="list-disc list-inside text-sm">
+                      {teamValidation.warnings.map((warn, i) => (
+                        <li key={i}>{warn}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Team Name & Hours */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -640,7 +860,7 @@ export default function LineConfig() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-slate-300">Début</Label>
+                  <Label className="text-slate-300">Heure début</Label>
                   <Input
                     type="time"
                     value={editingTeam.day_start}
@@ -649,7 +869,7 @@ export default function LineConfig() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-slate-300">Fin</Label>
+                  <Label className="text-slate-300">Heure fin</Label>
                   <Input
                     type="time"
                     value={editingTeam.day_end}
@@ -681,41 +901,71 @@ export default function LineConfig() {
 
               <Separator className="bg-slate-700" />
 
-              {/* Breaks */}
+              {/* Breaks - Dynamic list */}
               <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Coffee className="h-4 w-4 text-yellow-400" />
-                  <Label className="text-slate-300">Pauses</Label>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Coffee className="h-4 w-4 text-yellow-400" />
+                    <Label className="text-slate-300">Pauses ({editingTeam.breaks.length})</Label>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addBreak}
+                    className="h-8 border-slate-600 text-slate-300"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Ajouter
+                  </Button>
                 </div>
-                <div className="space-y-3">
-                  {editingTeam.breaks.map((brk, index) => (
-                    <div key={index} className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">{brk.name}</Label>
+                
+                {editingTeam.breaks.length === 0 ? (
+                  <p className="text-center text-slate-500 py-4 text-sm">
+                    Aucune pause configurée. Cliquez sur "Ajouter" pour en créer une.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {editingTeam.breaks.map((brk, index) => (
+                      <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-slate-900/50 border border-slate-700">
+                        <span className="text-slate-400 font-medium text-sm w-16">
+                          Pause {index + 1}
+                        </span>
+                        <div className="flex-1 grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-500">Heure</Label>
+                            <Input
+                              type="time"
+                              value={brk.start_time}
+                              onChange={(e) => updateEditingTeamBreak(index, 'start_time', e.target.value)}
+                              className="bg-slate-800 border-slate-600 text-slate-100 h-9"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-slate-500">Durée (min)</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={120}
+                              value={brk.duration}
+                              onChange={(e) => updateEditingTeamBreak(index, 'duration', parseInt(e.target.value) || 0)}
+                              className="bg-slate-800 border-slate-600 text-slate-100 h-9"
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeBreak(index)}
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20 h-9 px-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">Heure début</Label>
-                        <Input
-                          type="time"
-                          value={brk.start_time}
-                          onChange={(e) => updateEditingTeamBreak(index, 'start_time', e.target.value)}
-                          className="bg-slate-800 border-slate-600 text-slate-100 h-9"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs text-slate-500">Durée (min)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          max={120}
-                          value={brk.duration}
-                          onChange={(e) => updateEditingTeamBreak(index, 'duration', parseInt(e.target.value) || 0)}
-                          className="bg-slate-800 border-slate-600 text-slate-100 h-9"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <Separator className="bg-slate-700" />
@@ -756,9 +1006,9 @@ export default function LineConfig() {
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-400">Alerte avant fin takt (min)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                  <div className="space-y-2 p-3 rounded-lg bg-slate-900/50 border border-slate-700">
+                    <Label className="text-xs text-slate-400">Alerte avant fin takt</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[editingTeam.sound_alerts.minutes_before_takt_end]}
@@ -768,11 +1018,13 @@ export default function LineConfig() {
                         step={1}
                         className="flex-1"
                       />
-                      <span className="text-sm font-mono text-orange-400 w-10">{editingTeam.sound_alerts.minutes_before_takt_end}m</span>
+                      <span className="text-sm font-mono text-orange-400 w-12 text-right">
+                        {editingTeam.sound_alerts.minutes_before_takt_end} min
+                      </span>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs text-slate-400">Alerte avant fin pause (min)</Label>
+                  <div className="space-y-2 p-3 rounded-lg bg-slate-900/50 border border-slate-700">
+                    <Label className="text-xs text-slate-400">Alerte avant fin pause</Label>
                     <div className="flex items-center gap-2">
                       <Slider
                         value={[editingTeam.sound_alerts.minutes_before_break_end]}
@@ -782,9 +1034,21 @@ export default function LineConfig() {
                         step={1}
                         className="flex-1"
                       />
-                      <span className="text-sm font-mono text-orange-400 w-10">{editingTeam.sound_alerts.minutes_before_break_end}m</span>
+                      <span className="text-sm font-mono text-orange-400 w-12 text-right">
+                        {editingTeam.sound_alerts.minutes_before_break_end} min
+                      </span>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Estimated Takts for this team */}
+              <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Takts estimés pour cette équipe</span>
+                  <span className="text-2xl font-mono font-bold text-green-400">
+                    {calculateTeamTakts(editingTeam)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -801,7 +1065,8 @@ export default function LineConfig() {
             </Button>
             <Button 
               onClick={saveTeam}
-              className="bg-blue-600 hover:bg-blue-500 text-white"
+              disabled={!teamValidation.isValid}
+              className="bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50"
             >
               {editingTeamIndex >= 0 ? 'Mettre à jour' : 'Ajouter'}
             </Button>
