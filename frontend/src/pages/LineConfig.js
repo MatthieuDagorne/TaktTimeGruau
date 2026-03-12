@@ -177,6 +177,7 @@ const createDefaultBreak = (index) => ({
   name: `Pause ${index + 1}`,
   start_time: '',
   duration: 15,
+  trigger_mode: 'immediate',
 });
 
 export default function LineConfig() {
@@ -208,17 +209,9 @@ export default function LineConfig() {
           day_end: '17:00',
           takt_duration: 30,
           breaks: [
-            { name: 'Pause 1', start_time: '10:00', duration: 15 },
-            { name: 'Pause 2', start_time: '12:00', duration: 60 },
+            { name: 'Pause 1', start_time: '10:00', duration: 15, trigger_mode: 'immediate' },
+            { name: 'Pause 2', start_time: '12:00', duration: 60, trigger_mode: 'immediate' },
           ],
-          sound_alerts: {
-            takt_start: true,
-            minutes_before_takt_end: 5,
-            takt_end: true,
-            break_start: true,
-            minutes_before_break_end: 5,
-            break_end: true,
-          },
           is_active: true,
         },
       ],
@@ -227,6 +220,14 @@ export default function LineConfig() {
     auto_start_at_day_begin: false,
     auto_resume_after_break: true,
     auto_resume_after_takt: true,
+    sound_alerts: {
+      takt_start: true,
+      minutes_before_takt_end: 5,
+      takt_end: true,
+      break_start: true,
+      minutes_before_break_end: 5,
+      break_end: true,
+    },
   });
 
   useEffect(() => {
@@ -272,12 +273,13 @@ export default function LineConfig() {
           active_team_id: null,
         };
       } else {
-        // Ensure breaks have proper names
+        // Ensure breaks have proper names and trigger_mode
         shiftOrg.teams = shiftOrg.teams.map(team => ({
           ...team,
           breaks: (team.breaks || []).map((b, i) => ({
             ...b,
-            name: `Pause ${i + 1}`,
+            name: b.name || `Pause ${i + 1}`,
+            trigger_mode: b.trigger_mode || 'immediate',
           })),
         }));
       }
@@ -290,6 +292,14 @@ export default function LineConfig() {
         auto_start_at_day_begin: data.auto_start_at_day_begin ?? false,
         auto_resume_after_break: data.auto_resume_after_break ?? true,
         auto_resume_after_takt: data.auto_resume_after_takt ?? true,
+        sound_alerts: data.sound_alerts || {
+          takt_start: true,
+          minutes_before_takt_end: 5,
+          takt_end: true,
+          break_start: true,
+          minutes_before_break_end: 5,
+          break_end: true,
+        },
       });
     } catch (err) {
       toast.error('Erreur lors du chargement de la ligne');
@@ -786,6 +796,93 @@ export default function LineConfig() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Sound Alerts (Global) */}
+            <Card className="bg-slate-800/50 border-slate-700">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/20">
+                    <Volume2 className="h-5 w-5 text-purple-400" />
+                  </div>
+                  <CardTitle className="text-lg text-slate-100">Alertes sonores</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Son début de takt</span>
+                  <Switch
+                    checked={formData.sound_alerts?.takt_start ?? true}
+                    onCheckedChange={(checked) => setFormData({
+                      ...formData,
+                      sound_alerts: { ...formData.sound_alerts, takt_start: checked }
+                    })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Son fin de takt</span>
+                  <Switch
+                    checked={formData.sound_alerts?.takt_end ?? true}
+                    onCheckedChange={(checked) => setFormData({
+                      ...formData,
+                      sound_alerts: { ...formData.sound_alerts, takt_end: checked }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300">Alerte avant fin de takt</span>
+                    <span className="text-sm text-slate-400">{formData.sound_alerts?.minutes_before_takt_end || 5} min</span>
+                  </div>
+                  <Slider
+                    value={[formData.sound_alerts?.minutes_before_takt_end || 5]}
+                    onValueChange={([val]) => setFormData({
+                      ...formData,
+                      sound_alerts: { ...formData.sound_alerts, minutes_before_takt_end: val }
+                    })}
+                    min={1}
+                    max={10}
+                    step={1}
+                  />
+                </div>
+                <Separator className="bg-slate-700" />
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Son début de pause</span>
+                  <Switch
+                    checked={formData.sound_alerts?.break_start ?? true}
+                    onCheckedChange={(checked) => setFormData({
+                      ...formData,
+                      sound_alerts: { ...formData.sound_alerts, break_start: checked }
+                    })}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">Son fin de pause</span>
+                  <Switch
+                    checked={formData.sound_alerts?.break_end ?? true}
+                    onCheckedChange={(checked) => setFormData({
+                      ...formData,
+                      sound_alerts: { ...formData.sound_alerts, break_end: checked }
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300">Alerte avant fin de pause</span>
+                    <span className="text-sm text-slate-400">{formData.sound_alerts?.minutes_before_break_end || 5} min</span>
+                  </div>
+                  <Slider
+                    value={[formData.sound_alerts?.minutes_before_break_end || 5]}
+                    onValueChange={([val]) => setFormData({
+                      ...formData,
+                      sound_alerts: { ...formData.sound_alerts, minutes_before_break_end: val }
+                    })}
+                    min={1}
+                    max={10}
+                    step={1}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Sidebar */}
@@ -989,13 +1086,24 @@ export default function LineConfig() {
                     Aucune pause configurée. Cliquez sur "Ajouter" pour en créer une.
                   </p>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {editingTeam.breaks.map((brk, index) => (
-                      <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                        <span className="text-slate-400 font-medium text-sm w-16">
-                          Pause {index + 1}
-                        </span>
-                        <div className="flex-1 grid grid-cols-2 gap-3">
+                      <div key={index} className="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-300 font-medium text-sm">
+                            Pause {index + 1}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeBreak(index)}
+                            className="h-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-1">
                             <Label className="text-xs text-slate-500">Heure</Label>
                             <Input
@@ -1017,93 +1125,29 @@ export default function LineConfig() {
                             />
                           </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeBreak(index)}
-                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20 h-9 px-2"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-slate-500">Déclenchement</Label>
+                          <Select
+                            value={brk.trigger_mode || 'immediate'}
+                            onValueChange={(value) => updateEditingTeamBreak(index, 'trigger_mode', value)}
+                          >
+                            <SelectTrigger className="bg-slate-800 border-slate-600 text-slate-100 h-9">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-800 border-slate-700">
+                              <SelectItem value="immediate" className="text-slate-200 focus:bg-slate-700">
+                                Immédiat (à l'heure prévue)
+                              </SelectItem>
+                              <SelectItem value="end_of_takt" className="text-slate-200 focus:bg-slate-700">
+                                Fin du takt en cours
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </div>
-
-              <Separator className="bg-slate-700" />
-
-              {/* Sound Alerts */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Volume2 className="h-4 w-4 text-orange-400" />
-                  <Label className="text-slate-300">Alertes sonores</Label>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                    <span className="text-sm text-slate-300">Début takt</span>
-                    <Switch
-                      checked={editingTeam.sound_alerts.takt_start}
-                      onCheckedChange={(checked) => updateEditingTeamSound('takt_start', checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                    <span className="text-sm text-slate-300">Fin takt</span>
-                    <Switch
-                      checked={editingTeam.sound_alerts.takt_end}
-                      onCheckedChange={(checked) => updateEditingTeamSound('takt_end', checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                    <span className="text-sm text-slate-300">Début pause</span>
-                    <Switch
-                      checked={editingTeam.sound_alerts.break_start}
-                      onCheckedChange={(checked) => updateEditingTeamSound('break_start', checked)}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                    <span className="text-sm text-slate-300">Fin pause</span>
-                    <Switch
-                      checked={editingTeam.sound_alerts.break_end}
-                      onCheckedChange={(checked) => updateEditingTeamSound('break_end', checked)}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                  <div className="space-y-2 p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                    <Label className="text-xs text-slate-400">Alerte avant fin takt</Label>
-                    <div className="flex items-center gap-2">
-                      <Slider
-                        value={[editingTeam.sound_alerts.minutes_before_takt_end]}
-                        onValueChange={([val]) => updateEditingTeamSound('minutes_before_takt_end', val)}
-                        min={1}
-                        max={15}
-                        step={1}
-                        className="flex-1"
-                      />
-                      <span className="text-sm font-mono text-orange-400 w-12 text-right">
-                        {editingTeam.sound_alerts.minutes_before_takt_end} min
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-2 p-3 rounded-lg bg-slate-900/50 border border-slate-700">
-                    <Label className="text-xs text-slate-400">Alerte avant fin pause</Label>
-                    <div className="flex items-center gap-2">
-                      <Slider
-                        value={[editingTeam.sound_alerts.minutes_before_break_end]}
-                        onValueChange={([val]) => updateEditingTeamSound('minutes_before_break_end', val)}
-                        min={1}
-                        max={15}
-                        step={1}
-                        className="flex-1"
-                      />
-                      <span className="text-sm font-mono text-orange-400 w-12 text-right">
-                        {editingTeam.sound_alerts.minutes_before_break_end} min
-                      </span>
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Estimated Takts for this team */}

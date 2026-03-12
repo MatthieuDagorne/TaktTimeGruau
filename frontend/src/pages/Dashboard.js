@@ -24,6 +24,7 @@ import {
   BarChart3,
   Copy,
   Check,
+  SkipForward,
 } from 'lucide-react';
 import { useTaktTimer } from '@/hooks/useTaktTimer';
 
@@ -91,6 +92,7 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
     currentTakt,
     estimatedTakts,
     isOvertime,
+    activeTaktDuration,
   } = useTaktTimer(
     line, 
     () => playSound('takt_warning'),
@@ -100,6 +102,9 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
 
   // Don't show overtime if auto-next is enabled
   const showOvertime = isOvertime && !line?.auto_resume_after_takt;
+  
+  // Show next takt button only when overtime AND auto-next is disabled
+  const showNextTaktButton = showOvertime;
 
   const handleStart = async () => {
     enableAudio();
@@ -108,6 +113,11 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
 
   const handlePause = async () => {
     await pauseTakt(line.id);
+  };
+
+  const handleNextTakt = async () => {
+    enableAudio();
+    await nextTakt(line.id);
   };
 
   // Get the active team's schedule for display
@@ -191,7 +201,7 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
             </div>
             <div className="flex justify-between text-[10px] text-slate-500">
               <span>Takt {currentTakt}/{estimatedTakts}</span>
-              <span>{line.takt_duration} min/takt</span>
+              <span>{activeTaktDuration} min/takt</span>
             </div>
           </div>
 
@@ -202,6 +212,18 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
               <span>{schedule.start} - {schedule.end}</span>
             </div>
           </div>
+
+          {/* Next Takt Button - Only shown when overtime and auto-next disabled */}
+          {showNextTaktButton && (
+            <Button 
+              onClick={handleNextTakt}
+              className="w-full h-9 bg-orange-600 hover:bg-orange-500 text-white font-semibold btn-control text-sm"
+              data-testid="next-takt-btn"
+            >
+              <SkipForward className="h-3.5 w-3.5 mr-1.5" />
+              Takt suivant
+            </Button>
+          )}
 
           {/* Control Buttons */}
           <div className="flex gap-1.5">

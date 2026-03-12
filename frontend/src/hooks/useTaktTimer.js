@@ -1,5 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+// Helper to get active team's takt duration
+const getActiveTeamTaktDuration = (line) => {
+  const shiftOrg = line?.shift_organization;
+  if (shiftOrg?.teams?.length > 0) {
+    const activeTeamId = shiftOrg.active_team_id;
+    const activeTeam = activeTeamId 
+      ? shiftOrg.teams.find(t => t.id === activeTeamId)
+      : shiftOrg.teams[0];
+    if (activeTeam?.takt_duration) {
+      return activeTeam.takt_duration;
+    }
+  }
+  return line?.takt_duration || 30;
+};
+
 export const useTaktTimer = (line, onWarning, onComplete, onAutoNext) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
@@ -8,7 +23,9 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext) => {
   const completeTriggered = useRef(false);
   const autoNextTriggered = useRef(false);
 
-  const taktDurationSeconds = line?.takt_duration ? line.takt_duration * 60 : 0;
+  // Use active team's takt duration
+  const activeTaktDuration = getActiveTeamTaktDuration(line);
+  const taktDurationSeconds = activeTaktDuration * 60;
   const state = line?.state || {};
   const status = state.status || 'idle';
   const autoResumeAfterTakt = line?.auto_resume_after_takt ?? true;
@@ -140,5 +157,6 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext) => {
     currentTakt: state.current_takt || 0,
     estimatedTakts: line?.estimated_takts || 0,
     isOvertime,
+    activeTaktDuration,  // Return active team's takt duration
   };
 };

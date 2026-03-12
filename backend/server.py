@@ -110,7 +110,7 @@ class WeeklySchedule(BaseModel):
     saturday: DaySchedule = Field(default_factory=lambda: DaySchedule(is_working_day=False))
     sunday: DaySchedule = Field(default_factory=lambda: DaySchedule(is_working_day=False))
 
-# Team/Shift Configuration - Each team has its own complete settings
+# Team/Shift Configuration - Each team has its own schedule settings
 class TeamShift(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str = "Équipe Matin"
@@ -118,17 +118,9 @@ class TeamShift(BaseModel):
     day_end: str = "14:00"
     takt_duration: int = 30  # Each team can have different takt duration
     breaks: List[Dict] = Field(default_factory=lambda: [
-        {"name": "Pause Matin", "start_time": "09:00", "duration": 15},
-        {"name": "Pause Midi", "start_time": "12:00", "duration": 30}
+        {"name": "Pause Matin", "start_time": "09:00", "duration": 15, "trigger_mode": "immediate"},
+        {"name": "Pause Midi", "start_time": "12:00", "duration": 30, "trigger_mode": "immediate"}
     ])
-    sound_alerts: Dict = Field(default_factory=lambda: {
-        "takt_start": True,
-        "minutes_before_takt_end": 5,
-        "takt_end": True,
-        "break_start": True,
-        "minutes_before_break_end": 5,
-        "break_end": True
-    })
     is_active: bool = True
 
 class ShiftOrganization(BaseModel):
@@ -148,6 +140,7 @@ class BreakConfig(BaseModel):
     name: str = ""
     start_time: str = ""
     duration: int = 0
+    trigger_mode: str = "immediate"  # "immediate" = at scheduled time, "end_of_takt" = at end of next takt
 
 class SoundAlertConfig(BaseModel):
     takt_start: bool = True
@@ -321,29 +314,44 @@ def get_active_team_for_current_time(line: dict) -> Optional[dict]:
     return teams[0] if teams else None
 
 def calculate_estimated_takts(line: dict, day_name: str = None) -> int:
-    """Calculate estimated number of takts for the day"""
+    """Calculate estimated number of takts for the day based on active team"""
     try:
-        schedule = get_day_schedule(line, day_name)
+        # Get active team to use their takt_duration
+        active_team = get_active_team_for_current_time(line)
         
-        if not schedule.get('is_working_day', True):
-            return 0
+        if active_team:
+            day_start = active_team.get('day_start', '08:00')
+            day_end = active_team.get('day_end', '17:00')
+            takt_duration = active_team.get('takt_duration', 30)
+            breaks = active_team.get('breaks', [])
+        else:
+            # Fallback to line-level config
+            schedule = get_day_schedule(line, day_name)
+            if not schedule.get('is_working_day', True):
+                return 0
+            day_start = schedule['day_start']
+            day_end = schedule['day_end']
+            takt_duration = line.get('takt_duration', 30)
+            breaks = schedule.get('breaks', line.get('breaks', []))
         
-        day_start_parts = schedule['day_start'].split(":")
-        day_end_parts = schedule['day_end'].split(":")
+        day_start_parts = day_start.split(":")
+        day_end_parts = day_end.split(":")
         
         start_minutes = int(day_start_parts[0]) * 60 + int(day_start_parts[1])
         end_minutes = int(day_end_parts[0]) * 60 + int(day_end_parts[1])
         
-        total_work_minutes = end_minutes - start_minutes
+        # Handle overnight shifts
+        if end_minutes < start_minutes:
+            total_work_minutes = (24 * 60 - start_minutes) + end_minutes
+        else:
+            total_work_minutes = end_minutes - start_minutes
         
         # Subtract breaks
-        breaks = schedule.get('breaks', line.get('breaks', []))
         for break_config in breaks:
             duration = break_config.get('duration', 0) if isinstance(break_config, dict) else break_config.duration
             if duration > 0:
                 total_work_minutes -= duration
         
-        takt_duration = line.get('takt_duration', 30)
         if total_work_minutes <= 0 or takt_duration <= 0:
             return 0
             

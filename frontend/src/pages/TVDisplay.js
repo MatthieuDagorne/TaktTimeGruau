@@ -13,6 +13,7 @@ import {
   Pause,
   Volume2,
   VolumeX,
+  SkipForward,
   Square,
 } from 'lucide-react';
 
@@ -84,10 +85,14 @@ export default function TVDisplay() {
     currentTakt,
     estimatedTakts,
     isOvertime,
+    activeTaktDuration,
   } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext);
 
   // Don't show overtime if auto-next is enabled
   const showOvertime = isOvertime && !line?.auto_resume_after_takt;
+  
+  // Show next takt button only when overtime AND auto-next is disabled
+  const showNextTaktButton = showOvertime;
 
   // Get the active team's schedule for display
   const getActiveTeamSchedule = () => {
@@ -179,6 +184,13 @@ export default function TVDisplay() {
 
   const handlePause = async () => {
     await pauseTakt(lineId);
+    await loadLine();
+  };
+
+  const handleNextTakt = async () => {
+    enableAudio();
+    setAudioEnabled(true);
+    await nextTakt(lineId);
     await loadLine();
   };
 
@@ -394,6 +406,18 @@ export default function TVDisplay() {
               Reprendre
             </Button>
           )
+        )}
+        
+        {/* Next Takt button - shown only when overtime and auto-next disabled */}
+        {showNextTaktButton && (
+          <Button 
+            onClick={handleNextTakt}
+            className="h-16 px-8 bg-orange-600 hover:bg-orange-500 text-white font-bold text-xl"
+            data-testid="tv-next-takt-btn"
+          >
+            <SkipForward className="h-6 w-6 mr-3" />
+            Takt suivant
+          </Button>
         )}
       </div>
 
