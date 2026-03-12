@@ -628,20 +628,29 @@ async def check_auto_start(line_id: str):
         else:
             elapsed_work_minutes = current_minutes - start_minutes
         
-        # Subtract breaks that have already passed
+        # Subtract breaks that have already passed completely
         breaks = active_team.get('breaks', [])
         for brk in breaks:
             break_start = brk.get('start_time', '')
             break_duration = brk.get('duration', 0)
-            if break_start:
+            if break_start and break_duration > 0:
                 break_start_min = time_to_minutes(break_start)
-                # Check if this break has passed
-                if is_time_in_shift(current_time_str, minutesToTime(break_start_min + break_duration), day_end) or current_minutes > break_start_min + break_duration:
+                break_end_min = break_start_min + break_duration
+                # Only subtract if break has completely passed
+                if current_minutes >= break_end_min:
                     elapsed_work_minutes -= break_duration
         
+        # Ensure elapsed_work_minutes is not negative
+        elapsed_work_minutes = max(0, elapsed_work_minutes)
+        
         # Calculate which takt we should be on
-        expected_takt = max(1, (elapsed_work_minutes // takt_duration) + 1)
-        elapsed_in_current_takt = elapsed_work_minutes % takt_duration
+        # Takt 1 starts at minute 0, Takt 2 at minute takt_duration, etc.
+        if elapsed_work_minutes < takt_duration:
+            expected_takt = 1
+            elapsed_in_current_takt = elapsed_work_minutes
+        else:
+            expected_takt = (elapsed_work_minutes // takt_duration) + 1
+            elapsed_in_current_takt = elapsed_work_minutes % takt_duration
         
         return {
             "should_auto_start": True,
@@ -652,6 +661,7 @@ async def check_auto_start(line_id: str):
             "day_end": day_end,
             "expected_takt": expected_takt,
             "elapsed_in_current_takt_minutes": elapsed_in_current_takt,
+            "elapsed_work_minutes": elapsed_work_minutes,
             "takt_duration": takt_duration,
             "active_team": active_team.get('name')
         }
