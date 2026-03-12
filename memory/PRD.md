@@ -39,6 +39,7 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 - WebSocket pour mises à jour temps réel
 - Logging automatique des événements
 - **Mode de déclenchement des pauses** (trigger_mode: immediate/end_of_takt)
+- **Report automatique (carryover)** du temps restant d'un takt non terminé au jour suivant
 
 ### Frontend (React)
 - **Dashboard**: 
@@ -46,7 +47,9 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
   - **Durée du takt et compteur depuis l'équipe active**
   - **Bouton "Takt suivant"** uniquement visible en overtime + auto-next désactivé
   - Bouton "URL" pour copier l'URL TV
+  - **Démarrage auto vérifié toutes les 30s** (pas seulement au refresh)
   - Logique auto-start: si activé → Suspendre/Reprendre seulement
+  - **Compte à rebours de pause** avec nom de la pause
   - Pas de bouton Stop
 - **Sites Management**: 
   - CRUD des sites
@@ -61,6 +64,9 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 - **Statistics**: Cartes KPI, tableau événements, export CSV
 - **Écran TV**: 
   - Affichage plein écran grand format
+  - **Compte à rebours de pause** avec nom affiché en grand
+  - **Démarrage auto vérifié toutes les 30s** (pas seulement au refresh)
+  - **Reprise automatique après pause** fonctionnelle
   - **Bouton "Takt suivant"** en orange (uniquement overtime + auto-next désactivé)
   - Horaires depuis l'équipe active
   - Logique conditionnelle comme le dashboard
@@ -85,9 +91,13 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 - ✅ Passage automatique au takt suivant
 - ✅ **Bouton "Takt suivant" manuel** (overtime + auto-next désactivé)
 - ✅ Sons industriels automobiles
-- ✅ **Démarrage automatique en début de journée** (calcule le bon takt)
+- ✅ **Démarrage automatique en début de journée** (vérifié toutes les 30s)
 - ✅ **Temps dépassé** affiché seulement si auto-next désactivé
 - ✅ **IDs masqués** sur tous les écrans
+- ✅ **Compte à rebours de pause** sur Dashboard ET écran TV
+- ✅ **Reprise automatique après pause** fonctionnelle
+- ✅ **Report automatique (carryover)** du temps non terminé au jour suivant
+- ✅ **Synchronisation Dashboard/TV** (même intervalle de polling 5s)
 
 ## Prioritized Backlog
 

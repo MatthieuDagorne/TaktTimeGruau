@@ -55,25 +55,41 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
   const navigate = useNavigate();
   const { startTakt, pauseTakt, enableAudio, playSound, nextTakt, autoStartTakt, checkAutoStart, startBreak, endDay } = useTakt();
   const [copied, setCopied] = useState(false);
-  const [autoStartChecked, setAutoStartChecked] = useState(false);
 
   // Check if auto-start is enabled
   const autoStartEnabled = line?.auto_start_at_day_begin ?? false;
 
-  // Auto-start check on component mount
+  // Auto-start check - runs periodically when line is idle
   useEffect(() => {
+    // Only check if line is idle and auto-start is enabled
+    if (!line || !autoStartEnabled || line?.state?.status !== 'idle') {
+      return;
+    }
+
     const checkAndAutoStart = async () => {
-      if (autoStartEnabled && !autoStartChecked && line?.state?.status === 'idle') {
-        setAutoStartChecked(true);
+      try {
+        console.log('[Dashboard] Checking auto-start for line:', line.id);
         const result = await checkAutoStart(line.id);
         if (result.should_auto_start) {
+          console.log('[Dashboard] Auto-starting takt for line:', line.id);
           await autoStartTakt(line.id);
           if (onAutoStartTriggered) onAutoStartTriggered();
         }
+      } catch (err) {
+        console.error('Auto-start check failed:', err);
       }
     };
+
+    // Check immediately
     checkAndAutoStart();
-  }, [autoStartEnabled, autoStartChecked, line?.id, line?.state?.status, checkAutoStart, autoStartTakt, onAutoStartTriggered]);
+
+    // Then check every 30 seconds while idle
+    const autoStartInterval = setInterval(checkAndAutoStart, 30000);
+
+    return () => {
+      clearInterval(autoStartInterval);
+    };
+  }, [line?.state?.status, autoStartEnabled, line?.id, checkAutoStart, autoStartTakt, onAutoStartTriggered]);
 
   const handleAutoNext = async () => {
     if (line?.auto_resume_after_takt) {

@@ -48,7 +48,6 @@ export default function TVDisplay() {
   const [loading, setLoading] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [showControls, setShowControls] = useState(false);
-  const [autoStartChecked, setAutoStartChecked] = useState(false);
   const controlsTimeout = useRef(null);
 
   // Check if auto-start is enabled
@@ -174,20 +173,37 @@ export default function TVDisplay() {
     };
   }, [lineId]);
 
-  // Auto-start check when line is loaded
+  // Auto-start check - runs periodically when line is idle
   useEffect(() => {
+    // Only check if line is idle and auto-start is enabled
+    if (!line || !autoStartEnabled || line?.state?.status !== 'idle') {
+      return;
+    }
+
     const checkAndAutoStart = async () => {
-      if (line && autoStartEnabled && !autoStartChecked && line?.state?.status === 'idle') {
-        setAutoStartChecked(true);
+      try {
+        console.log('[TVDisplay] Checking auto-start...');
         const result = await checkAutoStart(lineId);
         if (result.should_auto_start) {
+          console.log('[TVDisplay] Auto-starting takt');
           await autoStartTakt(lineId);
           await loadLine();
         }
+      } catch (err) {
+        console.error('Auto-start check failed:', err);
       }
     };
+
+    // Check immediately
     checkAndAutoStart();
-  }, [line, autoStartEnabled, autoStartChecked, lineId, checkAutoStart, autoStartTakt]);
+
+    // Then check every 30 seconds while idle
+    const autoStartInterval = setInterval(checkAndAutoStart, 30000);
+
+    return () => {
+      clearInterval(autoStartInterval);
+    };
+  }, [line?.state?.status, autoStartEnabled, lineId, checkAutoStart, autoStartTakt]);
 
   const loadLine = async () => {
     try {
