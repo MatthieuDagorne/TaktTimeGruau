@@ -174,8 +174,9 @@ export const TaktProvider = ({ children }) => {
   const pauseTakt = useCallback(async (lineId) => {
     const response = await axios.post(`${API}/lines/${lineId}/pause`);
     await fetchLines();
+    playSound('pause_start');  // Play pause/stop sound
     return response.data;
-  }, [fetchLines]);
+  }, [fetchLines, playSound]);
 
   const stopTakt = useCallback(async (lineId) => {
     const response = await axios.post(`${API}/lines/${lineId}/stop`);

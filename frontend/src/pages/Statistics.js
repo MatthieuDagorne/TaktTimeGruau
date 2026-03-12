@@ -311,43 +311,77 @@ export default function Statistics() {
                         <TableHead className="text-slate-400">Horodatage</TableHead>
                         <TableHead className="text-slate-400">Type</TableHead>
                         <TableHead className="text-slate-400">N° Takt</TableHead>
-                        <TableHead className="text-slate-400">Durée</TableHead>
-                        <TableHead className="text-slate-400">Retard</TableHead>
+                        <TableHead className="text-slate-400">Durée Takt</TableHead>
+                        <TableHead className="text-slate-400">Temps Arrêt</TableHead>
+                        <TableHead className="text-slate-400">Statut</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {events.slice(0, 50).map((event) => (
-                        <TableRow key={event.id} className="border-slate-700">
-                          <TableCell className="font-mono text-sm text-slate-300">
-                            {formatTimestamp(event.timestamp)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant="outline"
-                              className={eventTypeColors[event.event_type] || 'bg-slate-600/20 text-slate-400 border-slate-500'}
-                            >
-                              {eventTypeLabels[event.event_type] || event.event_type}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-slate-300">
-                            {event.takt_number || '-'}
-                          </TableCell>
-                          <TableCell className="font-mono text-slate-300">
-                            {event.duration_seconds ? formatDuration(event.duration_seconds) : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {event.is_overtime ? (
-                              <span className="text-red-400 font-mono">
-                                +{formatDuration(event.overtime_seconds)}
-                              </span>
-                            ) : event.event_type === 'takt_end' ? (
-                              <span className="text-green-400">À l'heure</span>
-                            ) : (
-                              '-'
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {events.slice(0, 50).map((event, index) => {
+                        // Calculate pause duration by finding the next resume event
+                        let pauseDuration = null;
+                        if (event.event_type === 'takt_pause' || event.event_type === 'break_start') {
+                          // Find the corresponding resume event
+                          for (let i = index - 1; i >= 0; i--) {
+                            const nextEvent = events[i];
+                            if (nextEvent.takt_number === event.takt_number && 
+                                (nextEvent.event_type === 'takt_resume' || nextEvent.event_type === 'break_end' || nextEvent.event_type === 'takt_start')) {
+                              const pauseTime = new Date(event.timestamp);
+                              const resumeTime = new Date(nextEvent.timestamp);
+                              pauseDuration = Math.round((resumeTime - pauseTime) / 1000);
+                              break;
+                            }
+                          }
+                        }
+
+                        return (
+                          <TableRow key={event.id} className="border-slate-700">
+                            <TableCell className="font-mono text-sm text-slate-300">
+                              {formatTimestamp(event.timestamp)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant="outline"
+                                className={eventTypeColors[event.event_type] || 'bg-slate-600/20 text-slate-400 border-slate-500'}
+                              >
+                                {eventTypeLabels[event.event_type] || event.event_type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-slate-300">
+                              {event.takt_number || '-'}
+                            </TableCell>
+                            <TableCell className="font-mono text-slate-300">
+                              {event.event_type === 'takt_end' && event.duration_seconds ? formatDuration(event.duration_seconds) : '-'}
+                            </TableCell>
+                            <TableCell className="font-mono">
+                              {(event.event_type === 'takt_pause' || event.event_type === 'break_start') ? (
+                                <span className="text-yellow-400">
+                                  {pauseDuration !== null ? formatDuration(pauseDuration) : 'En cours...'}
+                                </span>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {event.is_overtime ? (
+                                <span className="text-red-400 font-mono">
+                                  Retard +{formatDuration(event.overtime_seconds)}
+                                </span>
+                              ) : event.event_type === 'takt_end' ? (
+                                <span className="text-green-400">À l'heure</span>
+                              ) : event.event_type === 'takt_start' ? (
+                                <span className="text-blue-400">Démarré</span>
+                              ) : event.event_type === 'takt_resume' ? (
+                                <span className="text-green-400">Repris</span>
+                              ) : event.event_type === 'takt_pause' ? (
+                                <span className="text-yellow-400">Suspendu</span>
+                              ) : event.event_type === 'break_start' ? (
+                                <span className="text-orange-400">En pause</span>
+                              ) : (
+                                '-'
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                   {events.length > 50 && (

@@ -26,6 +26,7 @@ import {
   Check,
   SkipForward,
   Coffee,
+  AlertCircle,
 } from 'lucide-react';
 import { useTaktTimer } from '@/hooks/useTaktTimer';
 
@@ -223,6 +224,19 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Carryover Display - shown when idle with carryover */}
+          {status === 'idle' && line?.state?.carryover_takt && (
+            <div className="p-3 rounded-lg bg-purple-500/20 border border-purple-500/50">
+              <div className="flex items-center gap-2 mb-1">
+                <AlertCircle className="h-4 w-4 text-purple-400" />
+                <span className="text-purple-400 font-medium text-sm">Reliquat à reprendre</span>
+              </div>
+              <div className="text-sm text-purple-300">
+                Takt {line.state.carryover_takt} - {Math.floor((line.state.carryover_elapsed_seconds || 0) / 60)}m déjà écoulées
+              </div>
+            </div>
+          )}
+
           {/* Break Display - shown when on break */}
           {status === 'break' && currentBreakName && (
             <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/50">

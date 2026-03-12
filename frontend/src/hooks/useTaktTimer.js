@@ -241,9 +241,10 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
       const warningThreshold = warningMinutes * 60;
 
       // Check for warning (X minutes before end)
+      // Use a 10-second window to ensure we catch the threshold even with polling delays
       if (
         remaining <= warningThreshold &&
-        remaining > 0 &&
+        remaining > warningThreshold - 10 &&  // Within 10 seconds of threshold
         warningTriggeredForTakt.current !== currentTakt &&
         onWarning
       ) {

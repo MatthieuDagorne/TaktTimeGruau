@@ -15,6 +15,7 @@ import {
   VolumeX,
   SkipForward,
   Square,
+  AlertCircle,
 } from 'lucide-react';
 
 const StatusBadge = ({ status }) => {
@@ -307,6 +308,24 @@ export default function TVDisplay() {
 
       {/* Main Timer */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 md:px-12 -mt-8">
+        {/* Carryover Display - shown when idle with carryover */}
+        {status === 'idle' && line?.state?.carryover_takt && (
+          <div className="w-full max-w-3xl mb-6 p-8 rounded-3xl bg-purple-500/20 border-2 border-purple-400" data-testid="tv-carryover-display">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-10 w-10 text-purple-400" />
+                <span className="text-2xl md:text-3xl text-purple-400 font-bold uppercase tracking-wider">Reliquat à reprendre</span>
+              </div>
+              <div className="text-[10vw] md:text-[12vw] font-mono font-bold text-purple-400 leading-none py-2">
+                Takt {line.state.carryover_takt}
+              </div>
+              <p className="text-xl text-purple-400/80">
+                {Math.floor((line.state.carryover_elapsed_seconds || 0) / 60)} min déjà écoulées
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Break Display - shown when on break */}
         {status === 'break' && currentBreakName && (
           <div className="w-full max-w-3xl mb-6 p-8 rounded-3xl bg-orange-500/20 border-2 border-orange-400" data-testid="tv-break-display">

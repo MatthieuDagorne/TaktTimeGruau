@@ -729,14 +729,19 @@ def minutesToTime(minutes: int) -> str:
 @api_router.post("/lines/{line_id}/auto-start")
 async def auto_start_takt(line_id: str):
     """Auto-start a takt with the correct takt number based on elapsed time or carryover"""
+    line = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    
+    # Check if line is already running - prevent duplicate starts
+    current_status = line.get('state', {}).get('status', 'idle')
+    if current_status == 'running':
+        return {"message": "Line already running", "state": line.get('state', {})}
+    
     check_result = await check_auto_start(line_id)
     
     if not check_result.get('should_auto_start'):
         return {"message": "Auto-start not needed", "details": check_result}
-    
-    line = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
-    if not line:
-        raise HTTPException(status_code=404, detail="Line not found")
     
     expected_takt = check_result.get('expected_takt', 1)
     takt_duration = check_result.get('takt_duration', 30)

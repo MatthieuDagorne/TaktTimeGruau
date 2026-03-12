@@ -13,7 +13,7 @@ class IndustrialSoundManager {
       this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
       this.masterGain = this.audioContext.createGain();
       this.masterGain.connect(this.audioContext.destination);
-      this.masterGain.gain.value = 0.5; // Master volume
+      this.masterGain.gain.value = 0.8; // Master volume increased for industrial environment
     }
     if (this.audioContext.state === 'suspended') {
       this.audioContext.resume();
@@ -37,7 +37,7 @@ class IndustrialSoundManager {
   }
 
   // Create a beep with specific parameters
-  createTone(frequency, duration, type = 'sine', volume = 0.3) {
+  createTone(frequency, duration, type = 'sine', volume = 0.5) {
     if (!this.enabled || !this.audioContext) return;
 
     const oscillator = this.audioContext.createOscillator();
@@ -59,100 +59,123 @@ class IndustrialSoundManager {
     oscillator.stop(now + duration);
   }
 
-  // Industrial horn sound - single long tone (for takt start)
+  // TAKT START / RESUME - Ascending horn signal (long and clear)
+  // Used for: manual start, auto-start, resume after pause
   playTaktStart() {
     if (!this.enabled || !this.audioContext) return;
     
-    // Two-tone ascending horn (like factory start signal)
-    const now = this.audioContext.currentTime;
+    // Three ascending tones - longer and louder for industrial environment
+    // Similar to factory start siren
+    const tones = [
+      { freq: 440, delay: 0, duration: 0.5 },      // A4
+      { freq: 554, delay: 400, duration: 0.5 },    // C#5
+      { freq: 659, delay: 800, duration: 0.8 },    // E5 - longer final tone
+    ];
     
-    // First tone - lower
-    this.createTone(440, 0.3, 'square', 0.2);
-    
-    // Second tone - higher (after small delay)
-    setTimeout(() => {
-      this.createTone(554, 0.4, 'square', 0.25);
-    }, 250);
+    tones.forEach(({ freq, delay, duration }) => {
+      setTimeout(() => {
+        this.createTone(freq, duration, 'square', 0.5);
+      }, delay);
+    });
   }
 
-  // Warning beeps - rapid pulses (before takt end)
+  // TAKT WARNING - Rapid alert beeps (urgent)
+  // Used for: X minutes before takt end
   playTaktWarning() {
     if (!this.enabled || !this.audioContext) return;
     
-    // Triple beep warning (like forklift backup warning)
-    const beep = (delay) => {
+    // Five rapid beeps - louder and more urgent
+    const beepCount = 5;
+    for (let i = 0; i < beepCount; i++) {
       setTimeout(() => {
-        this.createTone(880, 0.15, 'square', 0.3);
-      }, delay);
-    };
-    
-    beep(0);
-    beep(200);
-    beep(400);
+        this.createTone(880, 0.2, 'square', 0.6);
+      }, i * 250);
+    }
   }
 
-  // Takt end - descending horn (signals completion)
+  // TAKT END - Descending horn (completion signal)
+  // Used for: takt completed
   playTaktEnd() {
     if (!this.enabled || !this.audioContext) return;
     
-    // Descending two-tone (opposite of start)
-    this.createTone(554, 0.3, 'square', 0.25);
+    // Descending three-tone (opposite of start) - longer
+    const tones = [
+      { freq: 659, delay: 0, duration: 0.5 },      // E5
+      { freq: 554, delay: 400, duration: 0.5 },    // C#5
+      { freq: 440, delay: 800, duration: 0.8 },    // A4 - longer final tone
+    ];
     
-    setTimeout(() => {
-      this.createTone(440, 0.5, 'square', 0.2);
-    }, 250);
+    tones.forEach(({ freq, delay, duration }) => {
+      setTimeout(() => {
+        this.createTone(freq, duration, 'square', 0.5);
+      }, delay);
+    });
   }
 
-  // Break start - melodic chime (pleasant, distinct from work sounds)
+  // PAUSE/STOP - Low warning horn (work stopping)
+  // Used for: manual pause, break start, production stop
+  playPauseStart() {
+    if (!this.enabled || !this.audioContext) return;
+    
+    // Two long low tones - clearly different from start
+    // Low frequency = STOP signal
+    const tones = [
+      { freq: 330, delay: 0, duration: 0.6 },      // E4 (low)
+      { freq: 262, delay: 500, duration: 0.8 },    // C4 (lower) - descending = stop
+    ];
+    
+    tones.forEach(({ freq, delay, duration }) => {
+      setTimeout(() => {
+        this.createTone(freq, duration, 'sawtooth', 0.5);
+      }, delay);
+    });
+  }
+
+  // BREAK START - Melodic chime (pleasant, distinct from work sounds)
   playBreakStart() {
     if (!this.enabled || !this.audioContext) return;
     
-    // Three ascending tones (like lunch bell)
+    // Three ascending tones (like lunch bell) - longer
     const tones = [523, 659, 784]; // C5, E5, G5
     tones.forEach((freq, i) => {
       setTimeout(() => {
-        this.createTone(freq, 0.25, 'sine', 0.25);
-      }, i * 150);
+        this.createTone(freq, 0.4, 'sine', 0.5);
+      }, i * 250);
     });
   }
 
-  // Break warning - gentle reminder beeps
+  // BREAK WARNING - Gentle reminder beeps
   playBreakWarning() {
     if (!this.enabled || !this.audioContext) return;
     
-    // Double soft beep
-    this.createTone(660, 0.1, 'sine', 0.2);
+    // Double soft beep - longer
+    this.createTone(660, 0.2, 'sine', 0.4);
     setTimeout(() => {
-      this.createTone(660, 0.1, 'sine', 0.2);
-    }, 150);
+      this.createTone(660, 0.2, 'sine', 0.4);
+    }, 300);
   }
 
-  // Break end - energetic return signal
+  // BREAK END / RESUME - Energetic return signal
   playBreakEnd() {
     if (!this.enabled || !this.audioContext) return;
     
-    // Ascending fanfare (back to work)
-    const tones = [392, 494, 587, 784]; // G4, B4, D5, G5
-    tones.forEach((freq, i) => {
-      setTimeout(() => {
-        this.createTone(freq, 0.15, 'square', 0.2);
-      }, i * 100);
-    });
+    // Same as takt_start - work is resuming
+    this.playTaktStart();
   }
 
   // Error/alert sound
   playError() {
     if (!this.enabled || !this.audioContext) return;
     
-    // Harsh buzz
-    this.createTone(200, 0.5, 'sawtooth', 0.2);
+    // Harsh buzz - longer
+    this.createTone(200, 0.8, 'sawtooth', 0.4);
   }
 
   // Generic notification
   playNotification() {
     if (!this.enabled || !this.audioContext) return;
     
-    this.createTone(800, 0.1, 'sine', 0.2);
+    this.createTone(800, 0.2, 'sine', 0.4);
   }
 
   // Play sound by type
@@ -166,6 +189,9 @@ class IndustrialSoundManager {
         break;
       case 'takt_end':
         this.playTaktEnd();
+        break;
+      case 'pause_start':      // New: for manual pause
+        this.playPauseStart();
         break;
       case 'break_start':
         this.playBreakStart();
