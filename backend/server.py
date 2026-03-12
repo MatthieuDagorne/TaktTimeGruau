@@ -157,7 +157,13 @@ class TaktState(BaseModel):
     elapsed_seconds: int = 0
     paused_at: Optional[str] = None
     current_break_name: Optional[str] = None
+    break_duration_minutes: Optional[int] = None
+    break_start_time: Optional[str] = None
     break_end_time: Optional[str] = None
+    # Carryover from previous day - stores unfinished takt info
+    carryover_takt: Optional[int] = None
+    carryover_elapsed_seconds: Optional[int] = None
+    carryover_date: Optional[str] = None  # Date when carryover was saved (YYYY-MM-DD)
 
 # Production Line Model (updated)
 class ProductionLineBase(BaseModel):
@@ -621,7 +627,43 @@ async def check_auto_start(line_id: str):
     if is_within_hours and auto_start_enabled and current_status == 'idle':
         start_minutes = time_to_minutes(day_start)
         current_minutes = time_to_minutes(current_time_str)
+        today_date = now_local.strftime('%Y-%m-%d')
         
+        # Check for carryover from previous day (within first 5 minutes of day start)
+        carryover_takt = state.get('carryover_takt')
+        carryover_elapsed = state.get('carryover_elapsed_seconds', 0)
+        carryover_date = state.get('carryover_date')
+        
+        # Use carryover if:
+        # 1. There's a carryover saved
+        # 2. Carryover is from yesterday or earlier (not today)
+        # 3. We're within the first 5 minutes of day start
+        minutes_since_start = current_minutes - start_minutes if current_minutes >= start_minutes else 0
+        use_carryover = (
+            carryover_takt is not None and 
+            carryover_date is not None and 
+            carryover_date != today_date and
+            minutes_since_start <= 5
+        )
+        
+        if use_carryover:
+            return {
+                "should_auto_start": True,
+                "reason": "Carryover from previous day",
+                "current_time": current_time_str,
+                "timezone": site_tz_str,
+                "day_start": day_start,
+                "day_end": day_end,
+                "expected_takt": carryover_takt,
+                "elapsed_in_current_takt_minutes": carryover_elapsed // 60,
+                "elapsed_in_current_takt_seconds": carryover_elapsed,
+                "takt_duration": takt_duration,
+                "active_team": active_team.get('name'),
+                "is_carryover": True,
+                "carryover_date": carryover_date
+            }
+        
+        # Normal calculation - no carryover
         # Handle overnight shifts
         if current_minutes < start_minutes:
             elapsed_work_minutes = (24 * 60 - start_minutes) + current_minutes
@@ -686,7 +728,7 @@ def minutesToTime(minutes: int) -> str:
 
 @api_router.post("/lines/{line_id}/auto-start")
 async def auto_start_takt(line_id: str):
-    """Auto-start a takt with the correct takt number based on elapsed time"""
+    """Auto-start a takt with the correct takt number based on elapsed time or carryover"""
     check_result = await check_auto_start(line_id)
     
     if not check_result.get('should_auto_start'):
@@ -697,40 +739,68 @@ async def auto_start_takt(line_id: str):
         raise HTTPException(status_code=404, detail="Line not found")
     
     expected_takt = check_result.get('expected_takt', 1)
-    elapsed_minutes = check_result.get('elapsed_in_current_takt_minutes', 0)
     takt_duration = check_result.get('takt_duration', 30)
+    is_carryover = check_result.get('is_carryover', False)
     
     now = datetime.now(timezone.utc)
     
-    # Calculate the start time for the current takt (backdate it)
-    takt_start_time = now - timedelta(minutes=elapsed_minutes)
-    
-    new_state = {
-        "status": "running",
-        "current_takt": expected_takt,
-        "takt_start_time": takt_start_time.isoformat(),
-        "elapsed_seconds": elapsed_minutes * 60,
-        "paused_at": None
-    }
-    
-    await log_takt_event(
-        line_id, line.get('site_id', ''), 'takt_start', expected_takt,
-        expected_duration_seconds=takt_duration * 60,
-        details={
-            "auto_started": True,
-            "active_team": check_result.get('active_team')
+    if is_carryover:
+        # Use carryover elapsed seconds
+        elapsed_seconds = check_result.get('elapsed_in_current_takt_seconds', 0)
+        takt_start_time = now - timedelta(seconds=elapsed_seconds)
+        
+        new_state = {
+            "status": "running",
+            "current_takt": expected_takt,
+            "takt_start_time": takt_start_time.isoformat(),
+            "elapsed_seconds": elapsed_seconds,
+            "paused_at": None,
+            # Clear carryover after using it
+            "carryover_takt": None,
+            "carryover_elapsed_seconds": None,
+            "carryover_date": None
         }
-    )
+        
+        await log_takt_event(
+            line_id, line.get('site_id', ''), 'takt_start', expected_takt,
+            expected_duration_seconds=takt_duration * 60,
+            details={
+                "auto_started": True,
+                "carryover_from": check_result.get('carryover_date'),
+                "active_team": check_result.get('active_team')
+            }
+        )
+    else:
+        # Normal auto-start calculation
+        elapsed_minutes = check_result.get('elapsed_in_current_takt_minutes', 0)
+        takt_start_time = now - timedelta(minutes=elapsed_minutes)
+        
+        new_state = {
+            "status": "running",
+            "current_takt": expected_takt,
+            "takt_start_time": takt_start_time.isoformat(),
+            "elapsed_seconds": elapsed_minutes * 60,
+            "paused_at": None
+        }
+        
+        await log_takt_event(
+            line_id, line.get('site_id', ''), 'takt_start', expected_takt,
+            expected_duration_seconds=takt_duration * 60,
+            details={
+                "auto_started": True,
+                "active_team": check_result.get('active_team')
+            }
+        )
     
     await db.production_lines.update_one({"id": line_id}, {"$set": {"state": new_state}})
     updated = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
     await manager.broadcast(line_id, {"type": "state_update", "data": updated})
     
     return {
-        "message": "Takt auto-started",
+        "message": "Takt auto-started" + (" (carryover)" if is_carryover else ""),
         "state": new_state,
         "expected_takt": expected_takt,
-        "elapsed_minutes": elapsed_minutes
+        "is_carryover": is_carryover
     }
 
 @api_router.post("/lines/{line_id}/start")
@@ -855,6 +925,88 @@ async def stop_takt(line_id: str):
     await manager.broadcast(line_id, {"type": "state_update", "data": updated})
     
     return {"message": "Takt stopped", "state": new_state}
+
+@api_router.post("/lines/{line_id}/end-day")
+async def end_day(line_id: str):
+    """End the day and save carryover if takt is unfinished"""
+    line = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    
+    state = line.get('state', {})
+    current_status = state.get('status', 'idle')
+    current_takt = state.get('current_takt', 0)
+    
+    # Get site timezone
+    site_tz_str = "Europe/Paris"
+    if line.get('site_id'):
+        site = await db.sites.find_one({"id": line['site_id']}, {"_id": 0})
+        if site:
+            site_tz_str = site.get('timezone', 'Europe/Paris')
+    
+    try:
+        site_tz = ZoneInfo(site_tz_str)
+    except:
+        site_tz = PARIS_TZ
+    
+    today_date = datetime.now(site_tz).strftime('%Y-%m-%d')
+    
+    # Calculate elapsed seconds if running
+    elapsed_seconds = state.get('elapsed_seconds', 0)
+    if current_status == 'running' and state.get('takt_start_time'):
+        now = datetime.now(timezone.utc)
+        takt_start = datetime.fromisoformat(state['takt_start_time'].replace('Z', '+00:00'))
+        elapsed_seconds += int((now - takt_start).total_seconds())
+    
+    # Get active team's takt duration
+    active_team = get_active_team_for_current_time(line)
+    takt_duration_seconds = (active_team.get('takt_duration', 30) if active_team else 30) * 60
+    
+    # Check if takt is unfinished
+    carryover_info = None
+    if current_takt > 0 and elapsed_seconds < takt_duration_seconds:
+        # Takt is unfinished - save carryover
+        carryover_info = {
+            "carryover_takt": current_takt,
+            "carryover_elapsed_seconds": elapsed_seconds,
+            "carryover_date": today_date
+        }
+    
+    # Set state to idle but preserve carryover
+    new_state = {
+        "status": "idle",
+        "current_takt": 0,
+        "takt_start_time": None,
+        "elapsed_seconds": 0,
+        "paused_at": None,
+        "carryover_takt": carryover_info.get('carryover_takt') if carryover_info else None,
+        "carryover_elapsed_seconds": carryover_info.get('carryover_elapsed_seconds') if carryover_info else None,
+        "carryover_date": carryover_info.get('carryover_date') if carryover_info else None
+    }
+    
+    # Log day end
+    await log_takt_event(
+        line_id, line.get('site_id', ''), 'day_end', current_takt,
+        details={
+            "elapsed_seconds": elapsed_seconds,
+            "has_carryover": carryover_info is not None,
+            "carryover": carryover_info
+        }
+    )
+    
+    await db.production_lines.update_one({"id": line_id}, {"$set": {"state": new_state}})
+    updated = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
+    await manager.broadcast(line_id, {"type": "state_update", "data": updated})
+    
+    if carryover_info:
+        remaining_seconds = takt_duration_seconds - elapsed_seconds
+        return {
+            "message": f"Journée terminée. Takt {current_takt} reporté au lendemain ({remaining_seconds // 60} min restantes)",
+            "carryover": carryover_info,
+            "remaining_seconds": remaining_seconds
+        }
+    else:
+        return {"message": "Journée terminée. Pas de report.", "carryover": None}
 
 @api_router.post("/lines/{line_id}/next")
 async def next_takt(line_id: str):

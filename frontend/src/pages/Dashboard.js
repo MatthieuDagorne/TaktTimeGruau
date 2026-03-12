@@ -53,7 +53,7 @@ const StatusBadge = ({ status }) => {
 
 const LineCard = ({ line, onAutoStartTriggered }) => {
   const navigate = useNavigate();
-  const { startTakt, pauseTakt, enableAudio, playSound, nextTakt, autoStartTakt, checkAutoStart, startBreak } = useTakt();
+  const { startTakt, pauseTakt, enableAudio, playSound, nextTakt, autoStartTakt, checkAutoStart, startBreak, endDay } = useTakt();
   const [copied, setCopied] = useState(false);
   const [autoStartChecked, setAutoStartChecked] = useState(false);
 
@@ -94,6 +94,15 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
     }
   };
 
+  const handleDayEnd = async (elapsedSeconds) => {
+    try {
+      console.log('[Dashboard] Day end triggered, saving carryover');
+      await endDay(line.id);
+    } catch (err) {
+      console.error('Day end failed:', err);
+    }
+  };
+
   const { 
     elapsedFormatted, 
     remainingFormatted, 
@@ -110,7 +119,8 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
     () => playSound('takt_warning'),
     () => playSound('takt_end'),
     handleAutoNext,
-    handleBreakStart
+    handleBreakStart,
+    handleDayEnd
   );
 
   // Don't show overtime if auto-next is enabled

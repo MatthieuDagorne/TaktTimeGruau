@@ -198,6 +198,12 @@ export const TaktProvider = ({ children }) => {
     return response.data;
   }, [fetchLines, playSound]);
 
+  const endDay = useCallback(async (lineId) => {
+    const response = await axios.post(`${API}/lines/${lineId}/end-day`);
+    await fetchLines();
+    return response.data;
+  }, [fetchLines]);
+
   // ==================== EVENTS & STATISTICS ====================
   const fetchEvents = useCallback(async (lineId = null, siteId = null, days = 1) => {
     try {
@@ -311,6 +317,7 @@ export const TaktProvider = ({ children }) => {
     stopTakt,
     nextTakt,
     startBreak,
+    endDay,
     // Events & Stats
     fetchEvents,
     fetchStatistics,

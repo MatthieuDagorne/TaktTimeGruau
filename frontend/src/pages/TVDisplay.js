@@ -43,7 +43,7 @@ const StatusBadge = ({ status }) => {
 
 export default function TVDisplay() {
   const { lineId } = useParams();
-  const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, nextTakt, checkAutoStart, autoStartTakt, startBreak } = useTakt();
+  const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, nextTakt, checkAutoStart, autoStartTakt, startBreak, endDay } = useTakt();
   const [line, setLine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -92,6 +92,16 @@ export default function TVDisplay() {
     }
   }, [lineId, startBreak, enableAudio]);
 
+  const handleDayEnd = useCallback(async (elapsedSeconds) => {
+    try {
+      console.log('[TVDisplay] Day end triggered, saving carryover');
+      await endDay(lineId);
+      await loadLine();
+    } catch (err) {
+      console.error('Day end failed:', err);
+    }
+  }, [lineId, endDay]);
+
   const { 
     elapsedFormatted, 
     remainingFormatted, 
@@ -105,7 +115,7 @@ export default function TVDisplay() {
     breakRemainingSeconds,
     currentBreakName,
     breakDurationMinutes,
-  } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext, handleBreakStart);
+  } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext, handleBreakStart, handleDayEnd);
 
   // Don't show overtime if auto-next is enabled
   const showOvertime = isOvertime && !line?.auto_resume_after_takt;

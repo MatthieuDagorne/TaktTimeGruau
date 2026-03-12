@@ -1,15 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-// Helper to get active team's takt duration
-const getActiveTeamTaktDuration = (line) => {
-  const activeTeam = getActiveTeam(line);
-  if (activeTeam?.takt_duration) {
-    return activeTeam.takt_duration;
-  }
-  return line?.takt_duration || 30;
-};
-
-// Helper to get active team - prioritizes manually set active_team_id
+// Helper to get active team
 const getActiveTeam = (line) => {
   const shiftOrg = line?.shift_organization;
   if (!shiftOrg?.teams?.length) return null;
@@ -25,6 +16,15 @@ const getActiveTeam = (line) => {
   
   // Fallback to first team
   return teams[0];
+};
+
+// Helper to get active team's takt duration
+const getActiveTeamTaktDuration = (line) => {
+  const activeTeam = getActiveTeam(line);
+  if (activeTeam?.takt_duration) {
+    return activeTeam.takt_duration;
+  }
+  return line?.takt_duration || 30;
 };
 
 // Helper to convert time string (HH:MM) to minutes since midnight
@@ -45,7 +45,18 @@ const getCurrentParisTime = () => {
   });
 };
 
-export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakStart) => {
+// Check if current time is past day end
+const isPastDayEnd = (dayEnd) => {
+  if (!dayEnd) return false;
+  const currentTime = getCurrentParisTime();
+  const currentMinutes = timeToMinutes(currentTime);
+  const dayEndMinutes = timeToMinutes(dayEnd);
+  
+  // Simple check - assumes no overnight shifts for day end detection
+  return currentMinutes >= dayEndMinutes;
+};
+
+export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakStart, onDayEnd) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [breakRemainingSeconds, setBreakRemainingSeconds] = useState(0);
@@ -54,6 +65,7 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
   const warningTriggeredForTakt = useRef(null);
   const completeTriggeredForTakt = useRef(null);
   const autoNextTriggeredForTakt = useRef(null);
+  const dayEndTriggeredRef = useRef(false);
   const breakTriggeredRef = useRef({});
 
   // Use active team's takt duration
@@ -64,6 +76,10 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
   const currentTakt = state.current_takt || 0;
   const autoResumeAfterTakt = line?.auto_resume_after_takt ?? true;
   const autoResumeAfterBreak = line?.auto_resume_after_break ?? true;
+
+  // Get active team's day end time
+  const activeTeam = getActiveTeam(line);
+  const dayEnd = activeTeam?.day_end || '17:00';
 
   const calculateElapsed = useCallback(() => {
     if (!state.takt_start_time || status === 'idle') {
@@ -102,7 +118,6 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
   const checkScheduledBreaks = useCallback(() => {
     if (status !== 'running' || !line) return null;
     
-    const activeTeam = getActiveTeam(line);
     if (!activeTeam?.breaks?.length) return null;
     
     const currentTime = getCurrentParisTime();
@@ -135,7 +150,7 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
     }
     
     return null;
-  }, [status, line]);
+  }, [status, line, activeTeam]);
 
   const formatTime = useCallback((totalSeconds) => {
     const isNegative = totalSeconds < 0;
@@ -150,6 +165,13 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
     }
     return `${prefix}${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, []);
+
+  // Reset day end trigger when status changes to idle
+  useEffect(() => {
+    if (status === 'idle') {
+      dayEndTriggeredRef.current = false;
+    }
+  }, [status]);
 
   useEffect(() => {
     // Clear previous interval
@@ -166,7 +188,19 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
       setRemainingSeconds(remaining);
       setBreakRemainingSeconds(breakRemaining);
 
-      // Only process alerts when running
+      // Check for end of day - only when running or paused
+      if ((status === 'running' || status === 'paused' || status === 'break') && !dayEndTriggeredRef.current) {
+        if (isPastDayEnd(dayEnd)) {
+          dayEndTriggeredRef.current = true;
+          console.log('[TIMER] End of day detected, calling onDayEnd');
+          if (onDayEnd) {
+            onDayEnd(elapsed);
+          }
+          return; // Stop processing after day end
+        }
+      }
+
+      // Only process other alerts when running
       if (status !== 'running') return;
 
       // Check for scheduled breaks
@@ -186,7 +220,6 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
       const warningThreshold = warningMinutes * 60;
 
       // Check for warning (X minutes before end)
-      // Trigger warning when remaining time crosses the threshold
       if (
         remaining <= warningThreshold &&
         remaining > 0 &&
@@ -230,18 +263,13 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
           }, 1500);
         }
       }
-
-      // Auto-resume after break ends
-      if (status === 'break' && breakRemaining <= 0 && autoResumeAfterBreak) {
-        // The backend will handle this via the start endpoint
-      }
     };
 
     // Initial update
     updateTimer();
 
     // Set interval for both running and break status
-    if (status === 'running' || status === 'break') {
+    if (status === 'running' || status === 'break' || status === 'paused') {
       intervalRef.current = setInterval(updateTimer, 1000);
     }
 
@@ -250,7 +278,7 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
         clearInterval(intervalRef.current);
       }
     };
-  }, [line, status, currentTakt, state.takt_start_time, state.elapsed_seconds, state.break_end_time, taktDurationSeconds, calculateElapsed, calculateBreakRemaining, checkScheduledBreaks, onWarning, onComplete, onAutoNext, onBreakStart, autoResumeAfterTakt, autoResumeAfterBreak, pendingBreak]);
+  }, [line, status, currentTakt, state.takt_start_time, state.elapsed_seconds, state.break_end_time, taktDurationSeconds, dayEnd, calculateElapsed, calculateBreakRemaining, checkScheduledBreaks, onWarning, onComplete, onAutoNext, onBreakStart, onDayEnd, autoResumeAfterTakt, autoResumeAfterBreak, pendingBreak]);
 
   const progressPercentage = taktDurationSeconds > 0 
     ? Math.min(100, (elapsedSeconds / taktDurationSeconds) * 100)
