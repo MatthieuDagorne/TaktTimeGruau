@@ -103,6 +103,16 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
     }
   };
 
+  const handleAutoResumeAfterBreak = async () => {
+    try {
+      console.log('[Dashboard] Auto-resume after break triggered');
+      enableAudio();
+      await startTakt(line.id);
+    } catch (err) {
+      console.error('Auto-resume after break failed:', err);
+    }
+  };
+
   const { 
     elapsedFormatted, 
     remainingFormatted, 
@@ -120,7 +130,8 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
     () => playSound('takt_end'),
     handleAutoNext,
     handleBreakStart,
-    handleDayEnd
+    handleDayEnd,
+    handleAutoResumeAfterBreak
   );
 
   // Don't show overtime if auto-next is enabled

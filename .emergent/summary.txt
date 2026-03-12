@@ -4,88 +4,98 @@ L'utilisateur a demandé une application industrielle Takt time pour cadencer le
 **PRODUCT REQUIREMENTS:**
 - **Back Office (Admin):**
   - Accessible depuis un PC ou un mobile pour configurer les lignes de production.
-  - **Paramètres par ligne :** Nom de la ligne, durée du takt (20-40 min), horaires de travail flexibles par jour, gestion des équipes (1x8, 2x8, 3x8) avec des configurations distinctes pour chaque équipe (horaires, durée de takt, pauses, alertes).
-  - **Pauses :** Nombre de pauses configurable pour chaque équipe, avec nom, heure de début et durée.
-  - **Alertes sonores :** Configurables pour divers événements (début/fin de takt, début/fin de pause, X minutes avant fin de takt/pause).
-  - **Commandes :** Démarrer, Suspendre, Arrêter le takt.
-  - **Fonctionnalités avancées :** Hiérarchie Site > Ligne > Écran, historique des événements avec export CSV, statistiques de base (temps moyen, retards).
+  - **Paramètres par ligne :** Nom de la ligne, durée du takt (20-90 min), horaires de travail flexibles par jour, gestion des équipes (1x8, 2x8, 3x8) avec des configurations distinctes pour chaque équipe (horaires, durée de takt, pauses, alertes).
+  - **Pauses :** Nombre de pauses configurable pour chaque équipe, avec nom, heure de début, durée et mode de déclenchement (immédiat ou à la fin du takt).
+  - **Alertes sonores :** Configurables globalement pour divers événements.
+  - **Commandes :** Démarrer, Suspendre, Reprendre le takt.
+  - **Options globales :** Démarrage automatique en début de journée, reprise automatique après pause, passage automatique au takt suivant.
+  - **Fonctionnalités avancées :** Hiérarchie Site > Ligne, historique des événements, report du temps de takt non terminé au jour suivant.
 - **Affichage TV :**
-  - Un affichage en plein écran pour les téléviseurs de l'atelier.
-  - Affiche en gros caractères : le temps écoulé/restant, le nom de la ligne, le nombre de takts (passés/restants), et le statut actuel (travail, pause, etc.).
+  - Un affichage en plein écran via une URL unique par ligne.
+  - Affiche en gros caractères : le temps écoulé/restant, le nom de la ligne, le nombre de takts (passés/restants), le statut actuel (travail, pause), et le compte à rebours de la pause.
 - **Accès :** Pas d'authentification requise.
 
 **User's preferred language**: Français. Le prochain agent DOIT répondre en français uniquement.
 
 **what currently exists?**
-Une application full-stack (FastAPI, React, MongoDB) a été développée.
-- **Backend () :** Contient les modèles de données (Sites, Lignes de Production avec équipes, Écrans, Événements Takt) et les points de terminaison API pour toutes les opérations CRUD et les commandes de contrôle du takt (démarrer, pauser, reprendre, arrêter).
-- **Frontend (React) :**
-  - ** :** Affiche toutes les lignes de production.
-  - ** :** Page de configuration détaillée pour les lignes, y compris la gestion de plusieurs équipes avec des horaires et des pauses flexibles pour chaque jour de la semaine.
-  - ** :** Vue plein écran pour l'affichage en temps réel du compte à rebours.
-  - ** &  :** Pages pour la gestion des statistiques/export et des sites.
-- L'application prend en charge une structure multi-sites, multi-lignes et multi-équipes (postes), avec des journaux d'événements pour les statistiques.
+Une application full-stack (FastAPI, React, MongoDB) a été développée. Le backend () gère toute la logique métier, y compris la gestion multi-sites, multi-équipes, les fuseaux horaires, le démarrage automatique, et le report de temps d'un jour à l'autre. Le frontend React contient un tableau de bord (), une page de configuration de ligne (), une page de gestion de site () et un affichage TV (). La communication d'état entre le backend et le frontend se fait actuellement par polling (interrogations périodiques).
 
 **Last working item**:
-    - Last item agent was working: L'agent travaillait sur une liste de quatre demandes de l'utilisateur (Chat 218). Il a implémenté (1) la suppression de la liste déroulante des équipes, (2) l'ajout d'un son lors de la reprise, et (3) le retrait de l'icône de suppression du tableau de bord. Cependant, il a omis de réimplémenter le bouton de suppression dans la page de configuration de la ligne et de vérifier la gestion du fuseau horaire (4). L'agent a ensuite appelé prématurément l'agent de déploiement.
+    - Last item agent was working: L'agent a commencé à investiguer trois problèmes signalés par l'utilisateur : (1) le compte à rebours de la pause ne s'affiche pas sur l'écran TV, (2) il y a un décalage de synchronisation d'environ 10 secondes entre le tableau de bord et l'écran TV, et (3) la reprise automatique après une pause ne fonctionne pas. L'agent a commencé par examiner le fichier  pour comprendre la source des problèmes.
     - Status: IN PROGRESS
     - Agent Testing Done: N
     - Which testing method agent to use? both
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - Issue 1: La fonctionnalité de suppression de ligne est manquante dans l'interface utilisateur. (P0)
-  - Issue 2: La gestion du fuseau horaire de Paris doit être vérifiée et implémentée. (P1)
+  - Issue 1: La reprise automatique après une pause ne fonctionne pas, même si l'option est activée. (P0)
+  - Issue 2: Le compte à rebours de la pause ne s'affiche pas sur l'écran TV. (P1)
+  - Issue 3: Il y a un décalage de synchronisation de ~10 secondes entre les différents écrans (Dashboard et TV). (P2)
   
   Issues Detail:
   - Issue 1: 
-     - Attempted fixes: L'icône de suppression a été retirée des cartes du tableau de bord (, ), mais la fonctionnalité n'a pas été ajoutée à la page  comme demandé.
+     - Attempted fixes: Aucune. L'investigation vient de commencer.
      - Next debug checklist: 
-        1. Ouvrir .
-        2. Ajouter un bouton Supprimer la ligne en bas de la page.
-        3. Implémenter une boîte de dialogue de confirmation (par exemple ) avant d'appeler le point de terminaison .
-        4. Après la suppression, rediriger l'utilisateur vers le tableau de bord.
-     - Why fix this issue and what will be achieved with the fix?: Permettre aux utilisateurs de supprimer des lignes de production obsolètes.
+        1. Examiner . Vérifier la logique dans le  qui gère la fin d'une pause ().
+        2. S'assurer que la condition  est correctement lue et déclenche un appel à la fonction de reprise ().
+        3. Valider que le  expose et appelle correctement l'endpoint  à la fin de la pause.
+     - Why fix this issue and what will be achieved with the fix?: Rétablir une fonctionnalité d'automatisation essentielle pour minimiser les interventions manuelles et respecter la configuration de l'utilisateur.
      - Status:  IN PROGRESS
      - Is recurring issue? N
      - Should Test frontend/backend/both after fix?: both
      - Blocked on other issue: none
   - Issue 2: 
-     - Attempted fixes: Aucun. La demande a été notée mais aucune action n'a été entreprise.
+     - Attempted fixes: Aucune. L'investigation vient de commencer.
      - Next debug checklist: 
-        1. Examiner  pour s'assurer que toutes les opérations  utilisent des horodatages conscients du fuseau horaire (par exemple, stocker en UTC).
-        2. Examiner le code frontend (ex: ) pour s'assurer que les heures sont affichées correctement dans le fuseau horaire de l'utilisateur ('Europe/Paris').
-     - Why fix this issue and what will be achieved with the fix?: Garantir que les takts, les pauses et les équipes commencent et se terminent aux heures locales correctes pour les utilisateurs en France.
-     - Status:  NOT STARTED
+        1. Ouvrir .
+        2. Analyser comment l'état de la ligne est affiché. Il manque probablement la logique conditionnelle pour afficher le compte à rebours de la pause lorsque .
+        3. Répliquer la logique d'affichage de la pause déjà présente dans  (utilisée dans le Dashboard), en utilisant la valeur  fournie par le hook .
+     - Why fix this issue and what will be achieved with the fix?: Fournir une information visuelle critique aux opérateurs sur le temps de pause restant directement sur l'affichage de l'atelier.
+     - Status:  IN PROGRESS
      - Is recurring issue? N
+     - Should Test frontend/backend/both after fix?: frontend
+     - Blocked on other issue: none
+  - Issue 3: 
+     - Attempted fixes: Aucune.
+     - Next debug checklist: 
+        1. Identifier la cause du délai. Le  utilise un  pour rafraîchir les données toutes les 5 secondes, tandis que  semble se fier uniquement à son timer interne après le chargement initial. Ce polling est la cause la plus probable du décalage.
+        2. Pour une solution rapide, uniformiser le polling sur toutes les vues.
+        3. Pour une solution robuste et long-terme, proposer à l'utilisateur de remplacer le système de polling par des **WebSockets** pour une synchronisation en temps réel. Cela éliminerait complètement le décalage.
+     - Why fix this issue and what will be achieved with the fix?: Assurer la cohérence des données sur tous les écrans en temps réel, ce qui est crucial pour la fiabilité d'un système de contrôle de production.
+     - Status:  NOT STARTED
+     - Is recurring issue? Y
      - Should Test frontend/backend/both after fix?: both
      - Blocked on other issue: none
 
 **In progress Task List**:
-  - Task 1: Finaliser les demandes de l'utilisateur du Chat 218. (P0)
+  - Task 1: Résoudre les bugs de pause et de synchronisation (P0)
   
  Task Detail:
   - Task 1: 
      - Where to resume: 
-        1. Implémenter la fonctionnalité de suppression de ligne dans la page .
-        2. Mettre en œuvre et vérifier la gestion correcte du fuseau horaire ('Europe/Paris') dans toute l'application.
-     - What will be achieved with this?: Répondre à toutes les demandes récentes de l'utilisateur et stabiliser l'ensemble des fonctionnalités.
+        1. Corriger la logique de reprise automatique dans .
+        2. Ajouter l'affichage du compte à rebours de pause dans .
+        3. Analyser et proposer une solution (court terme : polling unifié ; long terme : WebSockets) pour le problème de désynchronisation.
+     - What will be achieved with this?: Stabiliser les fonctionnalités de pause et garantir une expérience utilisateur cohérente et en temps réel.
      - Status:  IN PROGRESS
      - Should Test frontend/backend/both after fix?: both
      - Blocked on something: none
 
 **Upcoming and Future Tasks**
-- Aucune nouvelle fonctionnalité n'a été demandée. Les tâches futures pourraient inclure l'amélioration des statistiques ou la gestion des rôles utilisateurs.
+- **Refactoring (P1):** Modulariser  et décomposer le composant  pour améliorer la maintenabilité.
+- **Architecture (P1):** Mettre en place des WebSockets pour remplacer le polling et assurer une synchronisation parfaite et en temps réel entre tous les clients.
 
 **Completed work in this session**
-- **Phase 1: Création initiale** - Mise en place de l'application full-stack de base avec configuration de ligne, affichage TV et contrôles de takt.
-- **Phase 2: Multi-site et statistiques** - Ajout de la gestion multi-sites (), des statistiques avec export CSV (), et des horaires flexibles par jour.
-- **Phase 3: Multi-équipes et corrections** - Refonte du modèle pour gérer plusieurs équipes par ligne (), correction du bug de pause/reprise (), et implémentation du passage automatique au takt suivant ().
-- **Phase 4: Améliorations UI/UX** - Remplacement des pauses fixes par des pauses dynamiques et ajout de la validation des heures.
-- **Phase 5: Polissage final** - Suppression des éléments d'interface redondants et ajout d'un son pour la reprise après une pause.
+- **Correction du Fuseau Horaire :** La logique backend utilise maintenant le fuseau horaire 'Europe/Paris' pour la détermination du jour et de l'équipe active.
+- **Fonctionnalité de Suppression :** Le bouton de suppression de ligne a été ajouté à la page .
+- **Implémentation de 7 demandes utilisateur (Chat 58) :** Suppression des boutons 'Stop'/'Suivant', simplification de l'accès TV via URL, correction de l'affichage des horaires, augmentation de la plage de durée de takt à 90 min, ajout de l'option démarrage auto, et gestion du temps dépassé.
+- **Implémentation de 3 demandes utilisateur (Chat 134) :** Ajout du paramétrage de fuseau horaire par site, correction du bug de démarrage automatique et masquage des ID de ligne dans l'UI.
+- **Implémentation de 4 demandes utilisateur (Chat 213) :** Correction des bugs de calcul de takt liés à l'équipe active, centralisation des alertes sonores, ajout du mode de déclenchement des pauses, et réintroduction conditionnelle du bouton Takt suivant.
+- **Correction d'un bug critique (Chat 401/409) :** Le calcul du numéro de takt lors du démarrage automatique a été corrigé pour prendre en compte correctement les pauses.
+- **Fonctionnalité de Report (Carryover) (Chat 483) :** Implémentation d'un système automatique qui reporte le temps restant d'un takt non terminé à la fin de la journée sur le démarrage du jour suivant.
 
 **Earlier issues found/mentioned but not fixed**
-   - Aucun, à l'exception de ceux listés comme Pending/In progress.
+   - Aucun.
 
 **Known issue recurrence from previous fork**
   - N/A
@@ -94,10 +104,10 @@ Une application full-stack (FastAPI, React, MongoDB) a été développée.
 
 
 **Key Technical Concepts**
-- **Frontend:** React, Tailwind CSS, Shadcn/UI, React Router, date-fns
-- **Backend:** FastAPI, Pydantic, Motor (pilote async MongoDB)
+- **Frontend:** React, Tailwind CSS, Shadcn/UI, React Router, date-fns, lucide-react
+- **Backend:** FastAPI, Pydantic, Motor (pilote async MongoDB), pytz pour les fuseaux horaires
 - **Database:** MongoDB
-- **Architecture:** Application à page unique (SPA) avec une API REST.
+- **Architecture:** Application à page unique (SPA) avec une API REST. La synchronisation se fait par polling, ce qui cause des délais.
 
 **key DB schema**
   - **sites:** 
@@ -105,47 +115,50 @@ Une application full-stack (FastAPI, React, MongoDB) a été développée.
   - **takt_events:** 
 
 **changes in tech stack**
-  - Aucune.
+  -  a été ajouté au backend pour la gestion des fuseaux horaires.
 
 **All files of reference**
-- : Toute la logique backend.
-- : Point d'entrée principal.
-- : Page de configuration où la fonctionnalité de suppression doit être ajoutée.
-- : Logique principale du minuteur côté client.
-- : Gestion des alertes sonores.
-- : Routeur de l'application.
+- : **Fichier critique.** Contient la logique du timer et est la source probable des 3 bugs en cours.
+- : Doit être modifié pour afficher le compte à rebours de la pause.
+- : Gère l'état et les appels API. La logique de reprise automatique y est liée.
+- : Contient la logique de polling  qui cause la désynchronisation.
+- : Contient toute la logique métier, y compris les endpoints de pause et de reprise.
 
 **Areas that need refactoring**:
-- Le composant  est devenu très volumineux et pourrait être divisé en sous-composants plus petits pour une meilleure maintenabilité.
-- Le fichier  contient tous les modèles et points de terminaison et pourrait être modularisé.
+- **Synchronisation des données :** Le mécanisme de polling actuel est une source de bugs et de mauvaise expérience utilisateur. Il devrait être remplacé par une solution en temps réel comme les **WebSockets**.
+- Le composant  et le fichier  restent très volumineux et gagneraient à être modularisés.
 
 **key api endpoints**
-- : Récupérer toutes les lignes.
-- : Mettre à jour une ligne.
-- : Supprimer une ligne (la fonctionnalité UI est manquante).
-- : Contrôler le takt.
-- : Obtenir les statistiques.
-- : Gérer les sites.
+- : Démarre une pause.
+- : Reprend un takt après une pause ou un arrêt.
+- : Récupère l'état de toutes les lignes (utilisé par le polling).
+- : Sauvegarde l'état d'un takt pour le report au lendemain.
+- : Démarre automatiquement une ligne en début de journée, en tenant compte du report.
 
 **Critical Info for New Agent**
-- La priorité absolue est de terminer les demandes du Chat 218 : ré-implémenter la fonction de suppression et vérifier la gestion du fuseau horaire.
-- L'utilisateur est non technique mais très précis dans ses retours. L'UI/UX est un point d'attention récurrent.
-- Ne pas appeler l'agent de déploiement avant d'avoir terminé et testé toutes les tâches en cours.
+- La priorité absolue est de résoudre les 3 problèmes soulevés par l'utilisateur : la reprise automatique, l'affichage de la pause sur la TV, et le décalage de synchronisation.
+- Le problème de synchronisation (Issue #3) est architectural. Proposez à l'utilisateur de passer à une solution WebSocket pour une correction définitive, après avoir corrigé les deux autres bugs.
+- L'utilisateur est attentif aux détails et à la cohérence des calculs et de l'affichage. Testez minutieusement chaque changement.
 
 **documents and test reports created in this job**
   - 
   -  (et précédents)
 
 **Last 10 User Messages and any pending HUMAN messages** 
-- **Chat 218 (Pending):** Demande de (1) retirer le menu déroulant 1x8/2x8, (2) ajouter un son à la reprise, (3) déplacer le bouton de suppression, (4) vérifier le fuseau horaire.
-- **Chat 189 (Completed):** Demande de pauses dynamiques et de validation des heures.
-- **Chat 124 (Completed):** Rapport de bugs (pause/reprise, alerte manquante) et demandes de fonctionnalités (meilleurs sons, gestion des équipes).
-- **Chat 70, 72, 74 (Completed):** Spécifications pour l'historique, les statistiques, le multi-site et la gestion des écrans.
-- **Chat 5 (Completed):** Choix de conception initiaux (pas d'auth, thème sombre, etc.).
+- **Chat 522 (Pending):** L'utilisateur signale 3 bugs : 1. Le compte à rebours de la pause manque sur l'écran TV. 2. Il y a un décalage de ~10s entre les affichages. 3. La reprise automatique après pause ne fonctionne pas.
+- **Chat 520 (Resolved):** L'agent confirme la mise en œuvre de la fin de journée automatique et du report.
+- **Chat 483 (Resolved):** L'utilisateur précise que la fin de journée et le report doivent être automatiques, sans bouton manuel.
+- **Chat 428 (Resolved):** L'utilisateur demande que le temps restant d'un takt en fin de journée soit reporté au lendemain.
+- **Chat 427 (Resolved):** L'agent confirme la correction du bug de calcul de l'auto-start.
+- **Chat 406 (Resolved):** L'utilisateur signale une incohérence dans le calcul du numéro de takt (2ème takt au lieu du 3ème).
+- **Chat 401 (Resolved):** L'utilisateur signale une incohérence sur le nombre de takts (3/3 alors que la journée n'est pas finie).
+- **Chat 354 (Resolved):** L'utilisateur signale un bug de calcul du nombre de takts (lié à l'équipe active) et un problème avec les alertes sonores.
+- **Chat 321 (Resolved):** L'utilisateur signale que la pause ne se déclenche pas en mode immédiat et demande l'affichage du compte à rebours sur l'écran TV.
+- **Chat 213 & 216 (Resolved):** L'utilisateur signale des bugs sur les données de l'équipe active, demande la centralisation des alertes et une nouvelle option pour les pauses.
 
 **Project Health Check:**
-- **Broken:** La fonctionnalité Supprimer la ligne est inaccessible depuis l'interface.
-- **Mocked:** N/A
+- **Broken:** La reprise automatique après une pause. L'affichage du compte à rebours de la pause sur l'écran TV.
+- **Degraded:** La synchronisation de l'état entre les clients est lente (~10s de délai) à cause du polling.
 
 **3rd Party Integrations**
 - Aucune.
@@ -154,12 +167,12 @@ Une application full-stack (FastAPI, React, MongoDB) a été développée.
   - Testing agent used after significant changes: YES
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: []
-  - Known regressions: La fonctionnalité de suppression a été retirée sans être réimplémentée ailleurs.
+  - Known regressions: Les fonctionnalités de pause (reprise auto, affichage) ont régressé ou n'ont pas été complètement implémentées sur toutes les vues.
 
 **Credentials to test flow:**
 - N/A (pas d'authentification).
 
 **What agent forgot to execute**
-- L'agent a oublié de ré-implémenter le bouton de suppression dans .
-- L'agent n'a pas traité la demande de vérification du fuseau horaire.
-- L'agent a appelé l'agent de déploiement avant de terminer les tâches demandées.</analysis>
+- L'agent n'a pas implémenté l'affichage du compte à rebours de la pause sur l'écran , bien que cela ait été demandé et implémenté sur le .
+- La logique de reprise automatique après pause a un bug.
+- Le problème architectural de la synchronisation par polling n'a pas été traité et cause maintenant un problème visible pour l'utilisateur.</analysis>

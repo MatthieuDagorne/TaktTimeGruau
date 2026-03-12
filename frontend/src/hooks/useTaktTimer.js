@@ -56,7 +56,7 @@ const isPastDayEnd = (dayEnd) => {
   return currentMinutes >= dayEndMinutes;
 };
 
-export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakStart, onDayEnd) => {
+export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakStart, onDayEnd, onAutoResumeAfterBreak) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [breakRemainingSeconds, setBreakRemainingSeconds] = useState(0);
@@ -67,6 +67,7 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
   const autoNextTriggeredForTakt = useRef(null);
   const dayEndTriggeredRef = useRef(false);
   const breakTriggeredRef = useRef({});
+  const breakAutoResumeTriggeredRef = useRef(false);
 
   // Use active team's takt duration
   const activeTaktDuration = getActiveTeamTaktDuration(line);
@@ -173,6 +174,13 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
     }
   }, [status]);
 
+  // Reset break auto-resume trigger when status changes from break
+  useEffect(() => {
+    if (status !== 'break') {
+      breakAutoResumeTriggeredRef.current = false;
+    }
+  }, [status]);
+
   useEffect(() => {
     // Clear previous interval
     if (intervalRef.current) {
@@ -198,6 +206,19 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
           }
           return; // Stop processing after day end
         }
+      }
+
+      // Check for auto-resume after break ends
+      if (status === 'break' && breakRemaining <= 0 && !breakAutoResumeTriggeredRef.current) {
+        breakAutoResumeTriggeredRef.current = true;
+        console.log('[TIMER] Break ended, autoResumeAfterBreak:', autoResumeAfterBreak);
+        if (autoResumeAfterBreak && onAutoResumeAfterBreak) {
+          console.log('[TIMER] Triggering auto-resume after break');
+          setTimeout(() => {
+            onAutoResumeAfterBreak();
+          }, 1000);
+        }
+        return;
       }
 
       // Only process other alerts when running
@@ -278,7 +299,7 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
         clearInterval(intervalRef.current);
       }
     };
-  }, [line, status, currentTakt, state.takt_start_time, state.elapsed_seconds, state.break_end_time, taktDurationSeconds, dayEnd, calculateElapsed, calculateBreakRemaining, checkScheduledBreaks, onWarning, onComplete, onAutoNext, onBreakStart, onDayEnd, autoResumeAfterTakt, autoResumeAfterBreak, pendingBreak]);
+  }, [line, status, currentTakt, state.takt_start_time, state.elapsed_seconds, state.break_end_time, taktDurationSeconds, dayEnd, calculateElapsed, calculateBreakRemaining, checkScheduledBreaks, onWarning, onComplete, onAutoNext, onBreakStart, onDayEnd, onAutoResumeAfterBreak, autoResumeAfterTakt, autoResumeAfterBreak, pendingBreak]);
 
   const progressPercentage = taktDurationSeconds > 0 
     ? Math.min(100, (elapsedSeconds / taktDurationSeconds) * 100)

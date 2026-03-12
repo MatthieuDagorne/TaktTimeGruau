@@ -102,6 +102,18 @@ export default function TVDisplay() {
     }
   }, [lineId, endDay]);
 
+  const handleAutoResumeAfterBreak = useCallback(async () => {
+    try {
+      console.log('[TVDisplay] Auto-resume after break triggered');
+      enableAudio();
+      setAudioEnabled(true);
+      await startTakt(lineId);
+      await loadLine();
+    } catch (err) {
+      console.error('Auto-resume after break failed:', err);
+    }
+  }, [lineId, startTakt, enableAudio]);
+
   const { 
     elapsedFormatted, 
     remainingFormatted, 
@@ -115,7 +127,7 @@ export default function TVDisplay() {
     breakRemainingSeconds,
     currentBreakName,
     breakDurationMinutes,
-  } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext, handleBreakStart, handleDayEnd);
+  } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext, handleBreakStart, handleDayEnd, handleAutoResumeAfterBreak);
 
   // Don't show overtime if auto-next is enabled
   const showOvertime = isOvertime && !line?.auto_resume_after_takt;
@@ -153,8 +165,8 @@ export default function TVDisplay() {
       }
     });
 
-    // Refresh line data periodically as backup
-    const interval = setInterval(loadLine, 10000);
+    // Refresh line data periodically as backup (same interval as Dashboard for sync)
+    const interval = setInterval(loadLine, 5000);
 
     return () => {
       clearInterval(interval);
@@ -277,6 +289,22 @@ export default function TVDisplay() {
 
       {/* Main Timer */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 md:px-12 -mt-8">
+        {/* Break Display - shown when on break */}
+        {status === 'break' && currentBreakName && (
+          <div className="w-full max-w-4xl mb-8 p-6 rounded-2xl bg-yellow-500/20 border-2 border-yellow-500/50" data-testid="tv-break-display">
+            <div className="flex flex-col items-center justify-center gap-4">
+              <div className="flex items-center gap-3">
+                <Coffee className="h-10 w-10 text-yellow-400" />
+                <span className="text-2xl md:text-3xl text-yellow-400 font-bold uppercase tracking-wider">{currentBreakName}</span>
+              </div>
+              <div className="text-[15vw] md:text-[18vw] font-mono font-bold text-yellow-400 leading-none" data-testid="tv-break-countdown">
+                {breakRemainingFormatted}
+              </div>
+              <p className="text-xl text-yellow-400/70">Temps de pause restant</p>
+            </div>
+          </div>
+        )}
+
         {/* Remaining Time - Main Focus */}
         <div className="text-center mb-8">
           <p className="text-xl md:text-2xl text-slate-500 uppercase tracking-widest mb-2">Temps Restant</p>

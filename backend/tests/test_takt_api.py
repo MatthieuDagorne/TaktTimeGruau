@@ -16,7 +16,7 @@ import os
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = "https://takt-control-panel.preview.emergentagent.com"
+    BASE_URL = "https://factory-pulse-39.preview.emergentagent.com"
 
 # Test line IDs
 TRADY4_LINE_ID = "aba1336d-f810-4e7b-872c-b59efae4c132"
