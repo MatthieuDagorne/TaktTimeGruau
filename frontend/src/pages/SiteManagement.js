@@ -6,6 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -31,7 +38,27 @@ import {
   Edit,
   Trash2,
   Factory,
+  Globe,
 } from 'lucide-react';
+
+// Common timezones for industrial sites
+const TIMEZONES = [
+  { value: 'Europe/Paris', label: 'Paris (UTC+1/+2)' },
+  { value: 'Europe/London', label: 'Londres (UTC+0/+1)' },
+  { value: 'Europe/Berlin', label: 'Berlin (UTC+1/+2)' },
+  { value: 'Europe/Madrid', label: 'Madrid (UTC+1/+2)' },
+  { value: 'Europe/Rome', label: 'Rome (UTC+1/+2)' },
+  { value: 'Europe/Brussels', label: 'Bruxelles (UTC+1/+2)' },
+  { value: 'Europe/Amsterdam', label: 'Amsterdam (UTC+1/+2)' },
+  { value: 'Europe/Warsaw', label: 'Varsovie (UTC+1/+2)' },
+  { value: 'Europe/Prague', label: 'Prague (UTC+1/+2)' },
+  { value: 'Europe/Bucharest', label: 'Bucarest (UTC+2/+3)' },
+  { value: 'America/New_York', label: 'New York (UTC-5/-4)' },
+  { value: 'America/Chicago', label: 'Chicago (UTC-6/-5)' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles (UTC-8/-7)' },
+  { value: 'Asia/Shanghai', label: 'Shanghai (UTC+8)' },
+  { value: 'Asia/Tokyo', label: 'Tokyo (UTC+9)' },
+];
 
 export default function SiteManagement() {
   const navigate = useNavigate();
@@ -45,6 +72,7 @@ export default function SiteManagement() {
     name: '',
     location: '',
     description: '',
+    timezone: 'Europe/Paris',
   });
 
   useEffect(() => {
@@ -64,10 +92,11 @@ export default function SiteManagement() {
         name: site.name,
         location: site.location || '',
         description: site.description || '',
+        timezone: site.timezone || 'Europe/Paris',
       });
     } else {
       setEditingSite(null);
-      setFormData({ name: '', location: '', description: '' });
+      setFormData({ name: '', location: '', description: '', timezone: 'Europe/Paris' });
     }
     setDialogOpen(true);
   };
@@ -194,6 +223,11 @@ export default function SiteManagement() {
                 )}
                 
                 <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <Globe className="h-4 w-4" />
+                  <span>{TIMEZONES.find(tz => tz.value === site.timezone)?.label || site.timezone || 'Europe/Paris'}</span>
+                </div>
+                
+                <div className="flex items-center gap-2 text-sm text-slate-400">
                   <Factory className="h-4 w-4" />
                   <span>{site.line_count || 0} ligne(s) de production</span>
                 </div>
@@ -269,6 +303,28 @@ export default function SiteManagement() {
                 className="bg-slate-900/50 border-slate-700 text-slate-100"
                 data-testid="site-description-input"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="timezone" className="text-slate-300">Fuseau horaire</Label>
+              <Select
+                value={formData.timezone}
+                onValueChange={(value) => setFormData({ ...formData, timezone: value })}
+              >
+                <SelectTrigger className="bg-slate-900/50 border-slate-700 text-slate-100" data-testid="site-timezone-select">
+                  <SelectValue placeholder="Sélectionner un fuseau horaire" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700">
+                  {TIMEZONES.map((tz) => (
+                    <SelectItem 
+                      key={tz.value} 
+                      value={tz.value}
+                      className="text-slate-200 focus:bg-slate-700"
+                    >
+                      {tz.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button 

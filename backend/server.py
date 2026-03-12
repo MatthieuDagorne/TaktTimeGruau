@@ -67,6 +67,7 @@ class SiteBase(BaseModel):
     name: str
     location: str = ""
     description: str = ""
+    timezone: str = "Europe/Paris"  # Default timezone for the site
 
 class SiteCreate(SiteBase):
     pass
@@ -571,6 +572,160 @@ async def delete_line(line_id: str):
     return {"message": "Line deleted"}
 
 # ==================== TAKT CONTROL ENDPOINTS ====================
+
+@api_router.get("/lines/{line_id}/auto-start-check")
+async def check_auto_start(line_id: str):
+    """Check if the line should be auto-started based on current time and settings"""
+    line = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    
+    # Get site timezone (default to Paris)
+    site_tz_str = "Europe/Paris"
+    if line.get('site_id'):
+        site = await db.sites.find_one({"id": line['site_id']}, {"_id": 0})
+        if site:
+            site_tz_str = site.get('timezone', 'Europe/Paris')
+    
+    try:
+        site_tz = ZoneInfo(site_tz_str)
+    except:
+        site_tz = PARIS_TZ
+    
+    now_local = datetime.now(site_tz)
+    current_time_str = now_local.strftime('%H:%M')
+    current_day = now_local.strftime('%A').lower()
+    
+    # Check if auto-start is enabled
+    auto_start_enabled = line.get('auto_start_at_day_begin', False)
+    
+    # Get active team
+    active_team = get_active_team_for_current_time(line)
+    
+    if not active_team:
+        return {
+            "should_auto_start": False,
+            "reason": "No active team found",
+            "current_time": current_time_str,
+            "timezone": site_tz_str
+        }
+    
+    day_start = active_team.get('day_start', '08:00')
+    day_end = active_team.get('day_end', '17:00')
+    takt_duration = active_team.get('takt_duration', 30)
+    
+    # Check if we're within working hours
+    is_within_hours = is_time_in_shift(current_time_str, day_start, day_end)
+    
+    # Current state
+    state = line.get('state', {})
+    current_status = state.get('status', 'idle')
+    
+    # Calculate how many takts should have elapsed since day_start
+    if is_within_hours and auto_start_enabled and current_status == 'idle':
+        start_minutes = time_to_minutes(day_start)
+        current_minutes = time_to_minutes(current_time_str)
+        
+        # Handle overnight shifts
+        if current_minutes < start_minutes:
+            elapsed_work_minutes = (24 * 60 - start_minutes) + current_minutes
+        else:
+            elapsed_work_minutes = current_minutes - start_minutes
+        
+        # Subtract breaks that have already passed
+        breaks = active_team.get('breaks', [])
+        for brk in breaks:
+            break_start = brk.get('start_time', '')
+            break_duration = brk.get('duration', 0)
+            if break_start:
+                break_start_min = time_to_minutes(break_start)
+                # Check if this break has passed
+                if is_time_in_shift(current_time_str, minutesToTime(break_start_min + break_duration), day_end) or current_minutes > break_start_min + break_duration:
+                    elapsed_work_minutes -= break_duration
+        
+        # Calculate which takt we should be on
+        expected_takt = max(1, (elapsed_work_minutes // takt_duration) + 1)
+        elapsed_in_current_takt = elapsed_work_minutes % takt_duration
+        
+        return {
+            "should_auto_start": True,
+            "reason": "Within working hours and auto-start enabled",
+            "current_time": current_time_str,
+            "timezone": site_tz_str,
+            "day_start": day_start,
+            "day_end": day_end,
+            "expected_takt": expected_takt,
+            "elapsed_in_current_takt_minutes": elapsed_in_current_takt,
+            "takt_duration": takt_duration,
+            "active_team": active_team.get('name')
+        }
+    
+    return {
+        "should_auto_start": False,
+        "reason": "Outside working hours" if not is_within_hours else ("Auto-start disabled" if not auto_start_enabled else f"Already {current_status}"),
+        "current_time": current_time_str,
+        "timezone": site_tz_str,
+        "is_within_hours": is_within_hours,
+        "auto_start_enabled": auto_start_enabled,
+        "current_status": current_status,
+        "day_start": day_start,
+        "day_end": day_end
+    }
+
+def minutesToTime(minutes: int) -> str:
+    """Convert minutes since midnight to HH:MM string"""
+    h = (minutes // 60) % 24
+    m = minutes % 60
+    return f"{h:02d}:{m:02d}"
+
+@api_router.post("/lines/{line_id}/auto-start")
+async def auto_start_takt(line_id: str):
+    """Auto-start a takt with the correct takt number based on elapsed time"""
+    check_result = await check_auto_start(line_id)
+    
+    if not check_result.get('should_auto_start'):
+        return {"message": "Auto-start not needed", "details": check_result}
+    
+    line = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
+    if not line:
+        raise HTTPException(status_code=404, detail="Line not found")
+    
+    expected_takt = check_result.get('expected_takt', 1)
+    elapsed_minutes = check_result.get('elapsed_in_current_takt_minutes', 0)
+    takt_duration = check_result.get('takt_duration', 30)
+    
+    now = datetime.now(timezone.utc)
+    
+    # Calculate the start time for the current takt (backdate it)
+    takt_start_time = now - timedelta(minutes=elapsed_minutes)
+    
+    new_state = {
+        "status": "running",
+        "current_takt": expected_takt,
+        "takt_start_time": takt_start_time.isoformat(),
+        "elapsed_seconds": elapsed_minutes * 60,
+        "paused_at": None
+    }
+    
+    await log_takt_event(
+        line_id, line.get('site_id', ''), 'takt_start', expected_takt,
+        expected_duration_seconds=takt_duration * 60,
+        details={
+            "auto_started": True,
+            "active_team": check_result.get('active_team')
+        }
+    )
+    
+    await db.production_lines.update_one({"id": line_id}, {"$set": {"state": new_state}})
+    updated = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
+    await manager.broadcast(line_id, {"type": "state_update", "data": updated})
+    
+    return {
+        "message": "Takt auto-started",
+        "state": new_state,
+        "expected_takt": expected_takt,
+        "elapsed_minutes": elapsed_minutes
+    }
 
 @api_router.post("/lines/{line_id}/start")
 async def start_takt(line_id: str):

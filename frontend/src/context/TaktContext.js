@@ -147,6 +147,30 @@ export const TaktProvider = ({ children }) => {
     return response.data;
   }, [fetchLines, playSound]);
 
+  const checkAutoStart = useCallback(async (lineId) => {
+    try {
+      const response = await axios.get(`${API}/lines/${lineId}/auto-start-check`);
+      return response.data;
+    } catch (err) {
+      console.error('Error checking auto-start:', err);
+      return { should_auto_start: false };
+    }
+  }, []);
+
+  const autoStartTakt = useCallback(async (lineId) => {
+    try {
+      const response = await axios.post(`${API}/lines/${lineId}/auto-start`);
+      await fetchLines();
+      if (response.data.state?.status === 'running') {
+        playSound('takt_start');
+      }
+      return response.data;
+    } catch (err) {
+      console.error('Error auto-starting:', err);
+      return null;
+    }
+  }, [fetchLines, playSound]);
+
   const pauseTakt = useCallback(async (lineId) => {
     const response = await axios.post(`${API}/lines/${lineId}/pause`);
     await fetchLines();
@@ -281,6 +305,8 @@ export const TaktProvider = ({ children }) => {
     pingScreen,
     // Takt controls
     startTakt,
+    checkAutoStart,
+    autoStartTakt,
     pauseTakt,
     stopTakt,
     nextTakt,

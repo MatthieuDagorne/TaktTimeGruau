@@ -42,11 +42,12 @@ const StatusBadge = ({ status }) => {
 
 export default function TVDisplay() {
   const { lineId } = useParams();
-  const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, nextTakt } = useTakt();
+  const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, nextTakt, checkAutoStart, autoStartTakt } = useTakt();
   const [line, setLine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [showControls, setShowControls] = useState(false);
+  const [autoStartChecked, setAutoStartChecked] = useState(false);
   const controlsTimeout = useRef(null);
 
   // Check if auto-start is enabled
@@ -126,6 +127,21 @@ export default function TVDisplay() {
       disconnectWebSocket(lineId);
     };
   }, [lineId]);
+
+  // Auto-start check when line is loaded
+  useEffect(() => {
+    const checkAndAutoStart = async () => {
+      if (line && autoStartEnabled && !autoStartChecked && line?.state?.status === 'idle') {
+        setAutoStartChecked(true);
+        const result = await checkAutoStart(lineId);
+        if (result.should_auto_start) {
+          await autoStartTakt(lineId);
+          await loadLine();
+        }
+      }
+    };
+    checkAndAutoStart();
+  }, [line, autoStartEnabled, autoStartChecked, lineId, checkAutoStart, autoStartTakt]);
 
   const loadLine = async () => {
     try {
@@ -213,9 +229,6 @@ export default function TVDisplay() {
             <h1 className="text-3xl md:text-5xl font-heading font-bold text-white tracking-tight" data-testid="tv-line-name">
               {line.name}
             </h1>
-            <p className="text-lg md:text-xl text-slate-400 font-mono">
-              ID: {line.id.slice(0, 8)}
-            </p>
           </div>
         </div>
         <StatusBadge status={status} />

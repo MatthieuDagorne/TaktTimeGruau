@@ -49,13 +49,29 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const LineCard = ({ line }) => {
+const LineCard = ({ line, onAutoStartTriggered }) => {
   const navigate = useNavigate();
-  const { startTakt, pauseTakt, enableAudio, playSound, nextTakt } = useTakt();
+  const { startTakt, pauseTakt, enableAudio, playSound, nextTakt, autoStartTakt, checkAutoStart } = useTakt();
   const [copied, setCopied] = useState(false);
+  const [autoStartChecked, setAutoStartChecked] = useState(false);
 
   // Check if auto-start is enabled
   const autoStartEnabled = line?.auto_start_at_day_begin ?? false;
+
+  // Auto-start check on component mount
+  useEffect(() => {
+    const checkAndAutoStart = async () => {
+      if (autoStartEnabled && !autoStartChecked && line?.state?.status === 'idle') {
+        setAutoStartChecked(true);
+        const result = await checkAutoStart(line.id);
+        if (result.should_auto_start) {
+          await autoStartTakt(line.id);
+          if (onAutoStartTriggered) onAutoStartTriggered();
+        }
+      }
+    };
+    checkAndAutoStart();
+  }, [autoStartEnabled, autoStartChecked, line?.id, line?.state?.status, checkAutoStart, autoStartTakt, onAutoStartTriggered]);
 
   const handleAutoNext = async () => {
     if (line?.auto_resume_after_takt) {
@@ -141,7 +157,6 @@ const LineCard = ({ line }) => {
                 <CardTitle className="text-base font-heading text-slate-100 truncate">
                   {line.name}
                 </CardTitle>
-                <p className="text-xs text-slate-500 font-mono truncate">ID: {line.id.slice(0, 8)}</p>
               </div>
             </div>
             <StatusBadge status={status} />
@@ -408,7 +423,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
           {filteredLines.map((line, index) => (
             <div key={line.id} className={`stagger-${(index % 4) + 1}`}>
-              <LineCard line={line} onDelete={handleDelete} />
+              <LineCard line={line} onAutoStartTriggered={fetchLines} />
             </div>
           ))}
         </div>
