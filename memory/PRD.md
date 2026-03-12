@@ -16,8 +16,8 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 ## Core Requirements (Static)
 - Hiérarchie: Site > Ligne
 - Paramétrage: nom ligne, durée takt (20-90min), horaires par jour, pauses dynamiques, alertes sonores
-- Gestion équipes: multi-équipes avec horaires personnalisés par équipe
-- Commandes: suspendre, reprendre (démarrage manuel optionnel si auto-start désactivé)
+- Gestion équipes: multi-équipes avec horaires et durée de takt personnalisés
+- Commandes: suspendre, reprendre, takt suivant (en overtime)
 - Affichage TV: temps écoulé/restant, compteur takts, statut
 - Multi-lignes et multi-sites avec fuseau horaire par site
 - Persistance MongoDB commune
@@ -33,60 +33,61 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 - API REST complète avec CRUD: Sites, Lignes
 - **Fuseau horaire par site** (Europe/Paris par défaut, 15 options)
 - **Démarrage automatique intelligent** (`/auto-start-check`, `/auto-start`)
-  - Calcule le takt correct et le temps écoulé depuis le début de journée
-  - Respecte le fuseau horaire du site
+- **Calcul estimatedTakts utilise la durée de l'équipe active**
 - Endpoints événements et statistiques
 - Export CSV avec filtrage par période et ligne
 - WebSocket pour mises à jour temps réel
-- Calcul automatique du nombre de takts estimés
 - Logging automatique des événements
+- **Mode de déclenchement des pauses** (trigger_mode: immediate/end_of_takt)
 
 ### Frontend (React)
 - **Dashboard**: 
   - Liste des lignes, filtrage par site
-  - **IDs masqués** (plus visibles pour les utilisateurs)
-  - Affichage horaires depuis l'équipe active
+  - **Durée du takt et compteur depuis l'équipe active**
+  - **Bouton "Takt suivant"** uniquement visible en overtime + auto-next désactivé
   - Bouton "URL" pour copier l'URL TV
-  - **Logique auto-start**: si activé → Suspendre/Reprendre seulement
-  - **Pas de bouton Stop ni Takt suivant**
+  - Logique auto-start: si activé → Suspendre/Reprendre seulement
+  - Pas de bouton Stop
 - **Sites Management**: 
   - CRUD des sites
   - **Sélecteur de fuseau horaire** (15 options)
-  - Affichage du fuseau sur les cartes
 - **Configuration Équipes**: 
-  - Équipes configurables séparément
+  - Équipes configurables avec durée takt propre
+  - **Mode de déclenchement par pause** (Immédiat / Fin du takt en cours)
   - Slider takt **20-90 minutes**
-  - **3 options globales**: Démarrage auto, Reprise auto pause, Passage auto takt
+  - 3 options globales: Démarrage auto, Reprise auto pause, Passage auto takt
+  - **Alertes sonores au niveau global** (pas par équipe)
   - Bouton supprimer la ligne
 - **Statistics**: Cartes KPI, tableau événements, export CSV
 - **Écran TV**: 
   - Affichage plein écran grand format
-  - **ID masqué**
+  - **Bouton "Takt suivant"** en orange (uniquement overtime + auto-next désactivé)
   - Horaires depuis l'équipe active
-  - Logique auto-start identique au dashboard
+  - Logique conditionnelle comme le dashboard
 - Sons industriels: Beeps/horns adaptés environnement automobile
 
 ### Features Implémentées
 - ✅ Hiérarchie Site > Ligne
 - ✅ **Fuseau horaire par site** (Europe/Paris par défaut)
 - ✅ Multi-sites avec base commune
-- ✅ Multi-équipes avec configurations séparées
+- ✅ Multi-équipes avec **durée de takt propre par équipe**
+- ✅ **Affichage dynamique durée et compteur depuis équipe active**
 - ✅ Horaires overnight supportés (ex: 22:00 - 06:00)
 - ✅ **Durée takt configurable 20-90 min**
-- ✅ Pauses dynamiques (ajout/suppression)
-- ✅ Alertes sonores par équipe
+- ✅ Pauses dynamiques avec **mode de déclenchement** (immédiat / fin du takt)
+- ✅ **Alertes sonores globales** (pas par équipe)
 - ✅ Validation des incohérences
 - ✅ Historique/logs des événements
 - ✅ Statistiques: temps moyen, retards, taux respect
 - ✅ Export CSV (période 1-7 jours)
-- ✅ **URL TV simple à copier**
+- ✅ URL TV simple à copier
 - ✅ Affichage TV plein écran (sans ID)
 - ✅ Passage automatique au takt suivant
+- ✅ **Bouton "Takt suivant" manuel** (overtime + auto-next désactivé)
 - ✅ Sons industriels automobiles
 - ✅ **Démarrage automatique en début de journée** (calcule le bon takt)
 - ✅ **Temps dépassé** affiché seulement si auto-next désactivé
 - ✅ **IDs masqués** sur tous les écrans
-- ✅ **Suppression des boutons Stop et Takt suivant**
 
 ## Prioritized Backlog
 
@@ -94,12 +95,14 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 - [x] CRUD sites, lignes
 - [x] Contrôles takt
 - [x] Statistiques et export CSV
-- [x] Horaires par équipe
+- [x] Horaires par équipe avec durée takt propre
 - [x] Fuseau horaire par site
 - [x] Démarrage automatique intelligent
+- [x] Alertes sonores globales
+- [x] Mode de déclenchement des pauses
 
 ### P1 - High Priority
-- [ ] Gestion automatique des pauses programmées (déclenchement auto)
+- [ ] Gestion automatique des pauses programmées (déclenchement auto selon mode)
 - [ ] Mode kiosque automatique pour écrans TV (fullscreen F11)
 - [ ] Notifications push/alertes sur mobile
 
@@ -112,27 +115,32 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 ```
 Site (Usine Lyon, Paris, etc.) - avec fuseau horaire
   └── Ligne de Production (Ligne A, B, C...)
+        └── Équipes (durée takt propre)
+              └── Pauses (mode: immédiat / fin du takt)
         └── URL TV: /tv/{line_id}
 ```
 
 ## API Endpoints Clés
 - `GET /api/server-time` - Heure serveur (UTC et Paris)
 - `GET /api/sites` / `POST /api/sites` - CRUD sites avec timezone
-- `GET /api/lines` / `PUT /api/lines/{id}` - CRUD lignes
+- `GET /api/lines` / `PUT /api/lines/{id}` - CRUD lignes (estimated_takts calculé depuis équipe active)
 - `GET /api/lines/{id}/auto-start-check` - Vérifie si auto-start nécessaire
 - `POST /api/lines/{id}/auto-start` - Démarre avec le bon takt et temps
 - `POST /api/lines/{id}/start` - Démarrer/reprendre
 - `POST /api/lines/{id}/pause` - Suspendre
+- `POST /api/lines/{id}/next` - Passer au takt suivant
 - `GET /api/stats/{id}` - Statistiques
 
 ## Next Tasks
-1. Implémenter le déclenchement automatique des pauses selon horaires configurés
+1. Implémenter le déclenchement automatique des pauses selon le mode configuré
 2. Ajouter mode kiosque automatique pour écrans TV
 3. Graphiques de tendances sur la page statistiques
 
 ## Technical Notes
 - Fuseau horaire stocké au niveau du site (défaut: Europe/Paris)
-- Tous les calculs d'auto-start utilisent le fuseau du site
+- Durée du takt et estimated_takts calculés depuis l'équipe active (pas la ligne)
 - `auto_start_at_day_begin=true` désactive le bouton Démarrer
-- `auto_resume_after_takt=false` permet l'affichage du temps dépassé
+- `auto_resume_after_takt=false` affiche le bouton "Takt suivant" en overtime
+- `trigger_mode` des pauses: "immediate" ou "end_of_takt"
+- `sound_alerts` au niveau global de la ligne (pas par équipe)
 - IDs de ligne visibles uniquement dans les URLs (pas dans l'UI)
