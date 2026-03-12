@@ -271,9 +271,11 @@ export default function TVDisplay() {
     ? 'text-red-400' 
     : status === 'running' 
       ? 'text-green-400' 
-      : status === 'paused' || status === 'break'
+      : status === 'paused'
         ? 'text-yellow-400'
-        : 'text-slate-300';
+        : status === 'break'
+          ? 'text-slate-500'  // Takt time is dimmed during break
+          : 'text-slate-300';
 
   const progressColor = showOvertime
     ? 'from-red-500 to-red-600'
@@ -307,16 +309,16 @@ export default function TVDisplay() {
       <main className="flex-1 flex flex-col items-center justify-center px-6 md:px-12 -mt-8">
         {/* Break Display - shown when on break */}
         {status === 'break' && currentBreakName && (
-          <div className="w-full max-w-4xl mb-8 p-6 rounded-2xl bg-yellow-500/20 border-2 border-yellow-500/50" data-testid="tv-break-display">
-            <div className="flex flex-col items-center justify-center gap-4">
+          <div className="w-full max-w-3xl mb-6 p-8 rounded-3xl bg-orange-500/20 border-2 border-orange-400" data-testid="tv-break-display">
+            <div className="flex flex-col items-center justify-center gap-2">
               <div className="flex items-center gap-3">
-                <Coffee className="h-10 w-10 text-yellow-400" />
-                <span className="text-2xl md:text-3xl text-yellow-400 font-bold uppercase tracking-wider">{currentBreakName}</span>
+                <Coffee className="h-8 w-8 text-orange-400" />
+                <span className="text-xl md:text-2xl text-orange-400 font-bold uppercase tracking-wider">{currentBreakName}</span>
               </div>
-              <div className="text-[15vw] md:text-[18vw] font-mono font-bold text-yellow-400 leading-none" data-testid="tv-break-countdown">
+              <div className="text-[12vw] md:text-[14vw] font-mono font-bold text-orange-400 leading-none py-2" data-testid="tv-break-countdown">
                 {breakRemainingFormatted}
               </div>
-              <p className="text-xl text-yellow-400/70">Temps de pause restant</p>
+              <p className="text-lg text-orange-400/80">Temps de pause restant</p>
             </div>
           </div>
         )}
