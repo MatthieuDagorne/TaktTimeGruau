@@ -14,69 +14,89 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 4. **Direction** - Consultent les statistiques de performance
 
 ## Core Requirements (Static)
-- Hiérarchie: Site > Ligne > Écrans TV
-- Paramétrage: nom ligne, durée takt (20-40min), horaires par jour, 3 pauses, alertes sonores
-- Gestion équipes: 1×8, 2×8, 3×8 avec horaires personnalisés par jour
-- Commandes: démarrer, suspendre, arrêter
+- Hiérarchie: Site > Ligne
+- Paramétrage: nom ligne, durée takt (20-90min), horaires par jour, pauses dynamiques, alertes sonores
+- Gestion équipes: multi-équipes avec horaires personnalisés par équipe
+- Commandes: démarrer (optionnel), suspendre, reprendre
 - Affichage TV: temps écoulé/restant, compteur takts, statut
 - Multi-lignes et multi-sites
 - Persistance MongoDB commune
 - Sans authentification (accès libre)
 - Export CSV des événements (1-7 jours)
 - Statistiques de performance
+- URL TV simple à copier (pas de gestion d'écrans complexe)
 
 ## What's Been Implemented ✅
-**Date: 2026-03-11 (Mise à jour)**
+**Date: 2026-03-12 (Mise à jour)**
 
 ### Backend (FastAPI) - v2
-- API REST complète avec CRUD: Sites, Lignes, Écrans TV
+- API REST complète avec CRUD: Sites, Lignes
 - Endpoints événements et statistiques
 - Export CSV avec filtrage par période et ligne
 - WebSocket pour mises à jour temps réel
 - Calcul automatique du nombre de takts estimés
 - Logging automatique des événements (start/pause/stop/next)
-- **BUG FIX**: Temps écoulé conservé lors de pause/reprise
+- **Fuseau horaire Paris** (Europe/Paris) pour déterminer le jour actuel
+- **Champ auto_start_at_day_begin** pour démarrage automatique
 
 ### Frontend (React)
-- **Dashboard**: Liste des lignes, filtrage par site, boutons Sites/Statistiques
+- **Dashboard**: 
+  - Liste des lignes, filtrage par site
+  - Boutons Sites/Statistiques
+  - Affichage horaires depuis l'équipe active
+  - Bouton "URL" pour copier l'URL TV
+  - **Pas de bouton Stop ni Takt suivant**
+  - **Logique conditionnelle**: si auto-start activé → Suspendre/Reprendre seulement
 - **Sites Management**: CRUD des sites de production
-- **Screens Management**: CRUD des écrans TV avec IP et position
 - **Configuration Équipes**: 
-  - Organisation 1×8/2×8/3×8 avec équipes configurables séparément
+  - Équipes configurables séparément
   - Chaque équipe a ses propres: horaires, durée takt, pauses, alertes sonores
   - Dialogue d'édition complet avec tous les paramètres
-  - **Alerte avant fin pause** présente dans le dialogue
+  - **Slider takt 20-90 minutes**
+  - **3 options globales**: 
+    1. Démarrage auto en début de journée
+    2. Reprise auto après pause
+    3. Passage auto au takt suivant (pas de temps dépassé)
+  - **Bouton supprimer la ligne**
 - **Statistics**: Cartes KPI, tableau événements, export CSV
-- **Écran TV**: Affichage plein écran grand format
+- **Écran TV**: 
+  - Affichage plein écran grand format
+  - Horaires depuis l'équipe active
+  - **Pas de bouton Stop ni Next**
+  - **Logique conditionnelle** comme le dashboard
 - **Sons industriels**: Beeps/horns adaptés environnement automobile
 - Design industriel sombre responsive
-- **Passage auto au takt suivant** quand option activée
 
 ### Features Implémentées
-- ✅ Hiérarchie Site > Ligne > Écrans TV
+- ✅ Hiérarchie Site > Ligne
 - ✅ Multi-sites avec base commune
-- ✅ **Équipes 1×8/2×8/3×8 avec configurations séparées**
-- ✅ **Horaires overnight supportés** (ex: 22:00 - 06:00)
-- ✅ **Durée takt configurable par équipe** (20-40 min)
-- ✅ **Pauses dynamiques** (ajout/suppression, nommées "Pause 1", "Pause 2"...)
-- ✅ **Alertes sonores par équipe** (dont alerte avant fin pause)
-- ✅ **Validation des incohérences** (heure fin < début, pause hors horaires, etc.)
+- ✅ Multi-équipes avec configurations séparées
+- ✅ Horaires overnight supportés (ex: 22:00 - 06:00)
+- ✅ **Durée takt configurable 20-90 min**
+- ✅ Pauses dynamiques (ajout/suppression)
+- ✅ Alertes sonores par équipe
+- ✅ Validation des incohérences
 - ✅ Historique/logs des événements
 - ✅ Statistiques: temps moyen, retards, taux respect
 - ✅ Export CSV (période 1-7 jours)
-- ✅ Gestion des écrans TV (nom, IP, position)
+- ✅ **URL TV simple à copier**
 - ✅ Affichage TV plein écran
-- ✅ **Passage automatique au takt suivant**
-- ✅ **Sons industriels automobiles**
-- ✅ **Bug fix: temps conservé pause/reprise**
+- ✅ Passage automatique au takt suivant
+- ✅ Sons industriels automobiles
+- ✅ Bug fix: temps conservé pause/reprise
+- ✅ **Démarrage automatique en début de journée** (option)
+- ✅ **Temps dépassé affiché seulement si auto-next désactivé**
+- ✅ **Suppression du bouton Stop/Réinitialiser**
+- ✅ **Suppression du bouton Takt suivant**
+- ✅ **Fuseau horaire Europe/Paris**
 
 ## Prioritized Backlog
 
 ### P0 - Critical (Implémenté)
-- [x] CRUD sites, lignes, écrans TV
+- [x] CRUD sites, lignes
 - [x] Contrôles takt
 - [x] Statistiques et export CSV
-- [x] Horaires par jour
+- [x] Horaires par équipe
 
 ### P1 - High Priority
 - [ ] Gestion automatique des pauses programmées (déclenchement auto)
@@ -92,10 +112,16 @@ Application industrielle « Takt time » pour cadencer des lignes de production 
 ```
 Site (Usine Lyon, Paris, etc.)
   └── Ligne de Production (Ligne A, B, C...)
-        └── Écrans TV (Début, Milieu, Fin de ligne)
+        └── URL TV: /tv/{line_id}
 ```
 
 ## Next Tasks
 1. Implémenter le déclenchement automatique des pauses selon horaires configurés
 2. Ajouter mode kiosque/plein écran automatique pour les écrans TV
 3. Graphiques de tendances sur la page statistiques
+
+## Technical Notes
+- Fuseau horaire: Europe/Paris pour tous les calculs de jour
+- Les horaires sont stockés en UTC mais affichés/calculés en heure locale Paris
+- L'option auto_start_at_day_begin désactive le bouton Démarrer sur le dashboard
+- L'option auto_resume_after_takt contrôle l'affichage du temps dépassé (si false = temps dépassé visible)
