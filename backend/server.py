@@ -284,30 +284,18 @@ def is_time_in_shift(current_time_str: str, shift_start: str, shift_end: str) ->
     return start_min <= current_min < end_min
 
 def get_active_team_for_current_time(line: dict) -> Optional[dict]:
-    """Get the active team based on current Paris time"""
+    """Get the active team - prioritizes manually set active_team_id"""
     shift_org = line.get('shift_organization', {})
     teams = shift_org.get('teams', [])
     
     if not teams:
         return None
     
-    # Get current Paris time
-    paris_now = get_current_paris_time()
-    current_time_str = paris_now.strftime('%H:%M')
-    
-    # First, check if there's a manually set active team
+    # First priority: manually set active_team_id
     active_team_id = shift_org.get('active_team_id')
     if active_team_id:
         for team in teams:
             if team.get('id') == active_team_id:
-                return team
-    
-    # Otherwise, find team based on current time
-    for team in teams:
-        if team.get('is_active', True):
-            shift_start = team.get('day_start', '08:00')
-            shift_end = team.get('day_end', '17:00')
-            if is_time_in_shift(current_time_str, shift_start, shift_end):
                 return team
     
     # Fallback to first team
@@ -901,7 +889,8 @@ async def next_takt(line_id: str):
     return {"message": "Next takt started", "state": new_state}
 
 @api_router.post("/lines/{line_id}/break")
-async def start_break(line_id: str, break_name: str = "Pause"):
+async def start_break(line_id: str, break_name: str = "Pause", break_duration: int = 15):
+    """Start a break with specified name and duration in minutes"""
     line = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")
@@ -914,6 +903,9 @@ async def start_break(line_id: str, break_name: str = "Pause"):
         takt_start = datetime.fromisoformat(state['takt_start_time'].replace('Z', '+00:00'))
         elapsed += int((now - takt_start).total_seconds())
     
+    # Calculate break end time
+    break_end = now + timedelta(minutes=break_duration)
+    
     new_state = {
         "status": "break",
         "current_takt": state.get('current_takt', 0),
@@ -921,16 +913,18 @@ async def start_break(line_id: str, break_name: str = "Pause"):
         "elapsed_seconds": elapsed,
         "paused_at": now.isoformat(),
         "current_break_name": break_name,
-        "break_end_time": None
+        "break_duration_minutes": break_duration,
+        "break_start_time": now.isoformat(),
+        "break_end_time": break_end.isoformat()
     }
     
-    await log_takt_event(line_id, line.get('site_id', ''), 'break_start', state.get('current_takt', 0), details={"break_name": break_name})
+    await log_takt_event(line_id, line.get('site_id', ''), 'break_start', state.get('current_takt', 0), details={"break_name": break_name, "duration_minutes": break_duration})
     await db.production_lines.update_one({"id": line_id}, {"$set": {"state": new_state}})
     
     updated = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
     await manager.broadcast(line_id, {"type": "state_update", "data": updated})
     
-    return {"message": f"Break '{break_name}' started", "state": new_state}
+    return {"message": f"Break '{break_name}' started", "state": new_state, "break_end_time": break_end.isoformat()}
 
 # ==================== EVENTS & STATISTICS ENDPOINTS ====================
 

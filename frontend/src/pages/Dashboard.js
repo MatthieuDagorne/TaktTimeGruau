@@ -25,6 +25,7 @@ import {
   Copy,
   Check,
   SkipForward,
+  Coffee,
 } from 'lucide-react';
 import { useTaktTimer } from '@/hooks/useTaktTimer';
 
@@ -52,7 +53,7 @@ const StatusBadge = ({ status }) => {
 
 const LineCard = ({ line, onAutoStartTriggered }) => {
   const navigate = useNavigate();
-  const { startTakt, pauseTakt, enableAudio, playSound, nextTakt, autoStartTakt, checkAutoStart } = useTakt();
+  const { startTakt, pauseTakt, enableAudio, playSound, nextTakt, autoStartTakt, checkAutoStart, startBreak } = useTakt();
   const [copied, setCopied] = useState(false);
   const [autoStartChecked, setAutoStartChecked] = useState(false);
 
@@ -84,6 +85,15 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
     }
   };
 
+  const handleBreakStart = async (breakName, breakDuration) => {
+    try {
+      enableAudio();
+      await startBreak(line.id, breakName, breakDuration);
+    } catch (err) {
+      console.error('Break start failed:', err);
+    }
+  };
+
   const { 
     elapsedFormatted, 
     remainingFormatted, 
@@ -93,11 +103,14 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
     estimatedTakts,
     isOvertime,
     activeTaktDuration,
+    breakRemainingFormatted,
+    currentBreakName,
   } = useTaktTimer(
     line, 
     () => playSound('takt_warning'),
     () => playSound('takt_end'),
-    handleAutoNext
+    handleAutoNext,
+    handleBreakStart
   );
 
   // Don't show overtime if auto-next is enabled
@@ -173,6 +186,21 @@ const LineCard = ({ line, onAutoStartTriggered }) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {/* Break Display - shown when on break */}
+          {status === 'break' && currentBreakName && (
+            <div className="p-3 rounded-lg bg-yellow-500/20 border border-yellow-500/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Coffee className="h-4 w-4 text-yellow-400" />
+                  <span className="text-yellow-400 font-medium">{currentBreakName}</span>
+                </div>
+                <span className="text-2xl font-mono font-bold text-yellow-400">
+                  {breakRemainingFormatted}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Timer Display */}
           <div className="grid grid-cols-2 gap-2">
             <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-700">

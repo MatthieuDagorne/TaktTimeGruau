@@ -2,33 +2,68 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 // Helper to get active team's takt duration
 const getActiveTeamTaktDuration = (line) => {
-  const shiftOrg = line?.shift_organization;
-  if (shiftOrg?.teams?.length > 0) {
-    const activeTeamId = shiftOrg.active_team_id;
-    const activeTeam = activeTeamId 
-      ? shiftOrg.teams.find(t => t.id === activeTeamId)
-      : shiftOrg.teams[0];
-    if (activeTeam?.takt_duration) {
-      return activeTeam.takt_duration;
-    }
+  const activeTeam = getActiveTeam(line);
+  if (activeTeam?.takt_duration) {
+    return activeTeam.takt_duration;
   }
   return line?.takt_duration || 30;
 };
 
-export const useTaktTimer = (line, onWarning, onComplete, onAutoNext) => {
+// Helper to get active team - prioritizes manually set active_team_id
+const getActiveTeam = (line) => {
+  const shiftOrg = line?.shift_organization;
+  if (!shiftOrg?.teams?.length) return null;
+  
+  const teams = shiftOrg.teams;
+  
+  // First priority: manually set active_team_id
+  const activeTeamId = shiftOrg.active_team_id;
+  if (activeTeamId) {
+    const team = teams.find(t => t.id === activeTeamId);
+    if (team) return team;
+  }
+  
+  // Fallback to first team
+  return teams[0];
+};
+
+// Helper to convert time string (HH:MM) to minutes since midnight
+const timeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+// Helper to get current time in Paris timezone as HH:MM
+const getCurrentParisTime = () => {
+  const now = new Date();
+  return now.toLocaleTimeString('fr-FR', { 
+    timeZone: 'Europe/Paris', 
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: false 
+  });
+};
+
+export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakStart) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [breakRemainingSeconds, setBreakRemainingSeconds] = useState(0);
+  const [pendingBreak, setPendingBreak] = useState(null);
   const intervalRef = useRef(null);
-  const warningTriggered = useRef(false);
-  const completeTriggered = useRef(false);
-  const autoNextTriggered = useRef(false);
+  const warningTriggeredForTakt = useRef(null);
+  const completeTriggeredForTakt = useRef(null);
+  const autoNextTriggeredForTakt = useRef(null);
+  const breakTriggeredRef = useRef({});
 
   // Use active team's takt duration
   const activeTaktDuration = getActiveTeamTaktDuration(line);
   const taktDurationSeconds = activeTaktDuration * 60;
   const state = line?.state || {};
   const status = state.status || 'idle';
+  const currentTakt = state.current_takt || 0;
   const autoResumeAfterTakt = line?.auto_resume_after_takt ?? true;
+  const autoResumeAfterBreak = line?.auto_resume_after_break ?? true;
 
   const calculateElapsed = useCallback(() => {
     if (!state.takt_start_time || status === 'idle') {
@@ -52,80 +87,55 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext) => {
     return state.elapsed_seconds || 0;
   }, [state.takt_start_time, state.elapsed_seconds, status]);
 
-  useEffect(() => {
-    // Clear previous interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+  // Calculate break remaining time
+  const calculateBreakRemaining = useCallback(() => {
+    if (status !== 'break' || !state.break_end_time) {
+      return 0;
     }
+    const endTime = new Date(state.break_end_time).getTime();
+    const now = Date.now();
+    const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+    return remaining;
+  }, [status, state.break_end_time]);
 
-    // Reset triggers when takt changes
-    if (state.current_takt !== warningTriggered.current?.takt) {
-      warningTriggered.current = { takt: state.current_takt, triggered: false };
-      completeTriggered.current = { takt: state.current_takt, triggered: false };
-      autoNextTriggered.current = { takt: state.current_takt, triggered: false };
-    }
-
-    const updateTimer = () => {
-      const elapsed = calculateElapsed();
-      const remaining = Math.max(0, taktDurationSeconds - elapsed);
+  // Check for scheduled breaks
+  const checkScheduledBreaks = useCallback(() => {
+    if (status !== 'running' || !line) return null;
+    
+    const activeTeam = getActiveTeam(line);
+    if (!activeTeam?.breaks?.length) return null;
+    
+    const currentTime = getCurrentParisTime();
+    const currentMinutes = timeToMinutes(currentTime);
+    
+    for (const brk of activeTeam.breaks) {
+      if (!brk.start_time || !brk.duration) continue;
       
-      setElapsedSeconds(elapsed);
-      setRemainingSeconds(remaining);
-
-      // Check for warning (x minutes before end)
-      const warningThreshold = (line?.sound_alerts?.minutes_before_takt_end || 5) * 60;
-      if (
-        status === 'running' &&
-        remaining <= warningThreshold &&
-        remaining > 0 &&
-        !warningTriggered.current?.triggered &&
-        onWarning
-      ) {
-        warningTriggered.current = { takt: state.current_takt, triggered: true };
-        onWarning();
+      const breakStartMinutes = timeToMinutes(brk.start_time);
+      const breakKey = `${brk.name}_${brk.start_time}`;
+      
+      // Check if this break was already triggered today
+      if (breakTriggeredRef.current[breakKey]) continue;
+      
+      const triggerMode = brk.trigger_mode || 'immediate';
+      
+      if (triggerMode === 'immediate') {
+        // Trigger exactly at break time (within 1 minute window)
+        if (currentMinutes >= breakStartMinutes && currentMinutes < breakStartMinutes + 1) {
+          breakTriggeredRef.current[breakKey] = true;
+          return { ...brk, triggerNow: true };
+        }
+      } else if (triggerMode === 'end_of_takt') {
+        // Mark as pending when time is reached, trigger at end of takt
+        if (currentMinutes >= breakStartMinutes && currentMinutes < breakStartMinutes + 1) {
+          breakTriggeredRef.current[breakKey] = true;
+          return { ...brk, triggerNow: false, pendingUntilTaktEnd: true };
+        }
       }
-
-      // Check for completion
-      if (
-        status === 'running' &&
-        remaining <= 0 &&
-        !completeTriggered.current?.triggered &&
-        onComplete
-      ) {
-        completeTriggered.current = { takt: state.current_takt, triggered: true };
-        onComplete();
-      }
-
-      // Auto-advance to next takt if option is enabled
-      if (
-        status === 'running' &&
-        remaining <= 0 &&
-        autoResumeAfterTakt &&
-        !autoNextTriggered.current?.triggered &&
-        onAutoNext
-      ) {
-        autoNextTriggered.current = { takt: state.current_takt, triggered: true };
-        // Small delay to let the completion sound play
-        setTimeout(() => {
-          onAutoNext();
-        }, 1500);
-      }
-    };
-
-    // Initial update
-    updateTimer();
-
-    // Set interval only if running
-    if (status === 'running') {
-      intervalRef.current = setInterval(updateTimer, 1000);
     }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [line, status, state.current_takt, state.takt_start_time, state.elapsed_seconds, taktDurationSeconds, calculateElapsed, onWarning, onComplete, onAutoNext, autoResumeAfterTakt]);
+    
+    return null;
+  }, [status, line]);
 
   const formatTime = useCallback((totalSeconds) => {
     const isNegative = totalSeconds < 0;
@@ -141,6 +151,107 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext) => {
     return `${prefix}${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, []);
 
+  useEffect(() => {
+    // Clear previous interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+
+    const updateTimer = () => {
+      const elapsed = calculateElapsed();
+      const remaining = Math.max(0, taktDurationSeconds - elapsed);
+      const breakRemaining = calculateBreakRemaining();
+      
+      setElapsedSeconds(elapsed);
+      setRemainingSeconds(remaining);
+      setBreakRemainingSeconds(breakRemaining);
+
+      // Only process alerts when running
+      if (status !== 'running') return;
+
+      // Check for scheduled breaks
+      const scheduledBreak = checkScheduledBreaks();
+      if (scheduledBreak) {
+        if (scheduledBreak.triggerNow) {
+          if (onBreakStart) {
+            onBreakStart(scheduledBreak.name, scheduledBreak.duration);
+          }
+        } else if (scheduledBreak.pendingUntilTaktEnd) {
+          setPendingBreak(scheduledBreak);
+        }
+      }
+
+      // Get warning threshold from settings (in seconds)
+      const warningMinutes = line?.sound_alerts?.minutes_before_takt_end ?? 5;
+      const warningThreshold = warningMinutes * 60;
+
+      // Check for warning (X minutes before end)
+      // Trigger warning when remaining time crosses the threshold
+      if (
+        remaining <= warningThreshold &&
+        remaining > 0 &&
+        warningTriggeredForTakt.current !== currentTakt &&
+        onWarning
+      ) {
+        console.log(`[ALERT] Warning triggered for takt ${currentTakt}, remaining: ${remaining}s, threshold: ${warningThreshold}s`);
+        warningTriggeredForTakt.current = currentTakt;
+        onWarning();
+      }
+
+      // Check for completion (takt end)
+      if (
+        remaining <= 0 &&
+        completeTriggeredForTakt.current !== currentTakt &&
+        onComplete
+      ) {
+        console.log(`[ALERT] Complete triggered for takt ${currentTakt}`);
+        completeTriggeredForTakt.current = currentTakt;
+        onComplete();
+      }
+
+      // Handle end of takt - check for pending break or auto-advance
+      if (remaining <= 0 && autoNextTriggeredForTakt.current !== currentTakt) {
+        // If there's a pending break (end_of_takt mode), trigger it
+        if (pendingBreak) {
+          autoNextTriggeredForTakt.current = currentTakt;
+          const breakToStart = pendingBreak;
+          setPendingBreak(null);
+          if (onBreakStart) {
+            setTimeout(() => {
+              onBreakStart(breakToStart.name, breakToStart.duration);
+            }, 1500);
+          }
+        }
+        // Otherwise, auto-advance to next takt if option is enabled
+        else if (autoResumeAfterTakt && onAutoNext) {
+          autoNextTriggeredForTakt.current = currentTakt;
+          setTimeout(() => {
+            onAutoNext();
+          }, 1500);
+        }
+      }
+
+      // Auto-resume after break ends
+      if (status === 'break' && breakRemaining <= 0 && autoResumeAfterBreak) {
+        // The backend will handle this via the start endpoint
+      }
+    };
+
+    // Initial update
+    updateTimer();
+
+    // Set interval for both running and break status
+    if (status === 'running' || status === 'break') {
+      intervalRef.current = setInterval(updateTimer, 1000);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [line, status, currentTakt, state.takt_start_time, state.elapsed_seconds, state.break_end_time, taktDurationSeconds, calculateElapsed, calculateBreakRemaining, checkScheduledBreaks, onWarning, onComplete, onAutoNext, onBreakStart, autoResumeAfterTakt, autoResumeAfterBreak, pendingBreak]);
+
   const progressPercentage = taktDurationSeconds > 0 
     ? Math.min(100, (elapsedSeconds / taktDurationSeconds) * 100)
     : 0;
@@ -154,9 +265,15 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext) => {
     remainingFormatted: formatTime(isOvertime ? -(elapsedSeconds - taktDurationSeconds) : remainingSeconds),
     progressPercentage,
     status,
-    currentTakt: state.current_takt || 0,
+    currentTakt,
     estimatedTakts: line?.estimated_takts || 0,
     isOvertime,
-    activeTaktDuration,  // Return active team's takt duration
+    activeTaktDuration,
+    // Break-related data
+    breakRemainingSeconds,
+    breakRemainingFormatted: formatTime(breakRemainingSeconds),
+    currentBreakName: state.current_break_name || null,
+    breakDurationMinutes: state.break_duration_minutes || 0,
+    pendingBreak,
   };
 };

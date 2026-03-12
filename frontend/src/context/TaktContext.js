@@ -191,8 +191,8 @@ export const TaktProvider = ({ children }) => {
     return response.data;
   }, [fetchLines, playSound]);
 
-  const startBreak = useCallback(async (lineId, breakName) => {
-    const response = await axios.post(`${API}/lines/${lineId}/break?break_name=${encodeURIComponent(breakName)}`);
+  const startBreak = useCallback(async (lineId, breakName, breakDuration = 15) => {
+    const response = await axios.post(`${API}/lines/${lineId}/break?break_name=${encodeURIComponent(breakName)}&break_duration=${breakDuration}`);
     await fetchLines();
     playSound('break_start');
     return response.data;

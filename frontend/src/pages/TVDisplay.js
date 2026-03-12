@@ -43,7 +43,7 @@ const StatusBadge = ({ status }) => {
 
 export default function TVDisplay() {
   const { lineId } = useParams();
-  const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, nextTakt, checkAutoStart, autoStartTakt } = useTakt();
+  const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, nextTakt, checkAutoStart, autoStartTakt, startBreak } = useTakt();
   const [line, setLine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
@@ -55,13 +55,17 @@ export default function TVDisplay() {
   const autoStartEnabled = line?.auto_start_at_day_begin ?? false;
 
   const handleWarning = useCallback(() => {
-    if (audioEnabled && line?.sound_alerts?.minutes_before_takt_end) {
+    // Play warning sound if audio is enabled and warning minutes is configured
+    if (audioEnabled && line?.sound_alerts?.minutes_before_takt_end > 0) {
+      console.log('[TVDisplay] Playing takt warning sound');
       playSound('takt_warning');
     }
   }, [audioEnabled, line, playSound]);
 
   const handleComplete = useCallback(() => {
+    // Play end sound if audio is enabled and takt_end is true
     if (audioEnabled && line?.sound_alerts?.takt_end) {
+      console.log('[TVDisplay] Playing takt end sound');
       playSound('takt_end');
     }
   }, [audioEnabled, line, playSound]);
@@ -77,6 +81,17 @@ export default function TVDisplay() {
     }
   }, [line, lineId, nextTakt]);
 
+  const handleBreakStart = useCallback(async (breakName, breakDuration) => {
+    try {
+      enableAudio();
+      setAudioEnabled(true);
+      await startBreak(lineId, breakName, breakDuration);
+      await loadLine();
+    } catch (err) {
+      console.error('Break start failed:', err);
+    }
+  }, [lineId, startBreak, enableAudio]);
+
   const { 
     elapsedFormatted, 
     remainingFormatted, 
@@ -86,7 +101,11 @@ export default function TVDisplay() {
     estimatedTakts,
     isOvertime,
     activeTaktDuration,
-  } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext);
+    breakRemainingFormatted,
+    breakRemainingSeconds,
+    currentBreakName,
+    breakDurationMinutes,
+  } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext, handleBreakStart);
 
   // Don't show overtime if auto-next is enabled
   const showOvertime = isOvertime && !line?.auto_resume_after_takt;
