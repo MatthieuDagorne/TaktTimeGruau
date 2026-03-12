@@ -10,8 +10,12 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 import csv
 import io
+
+# Paris timezone for local time calculations
+PARIS_TZ = ZoneInfo("Europe/Paris")
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -173,6 +177,7 @@ class ProductionLineBase(BaseModel):
         BreakConfig(name="Pause Midi", start_time="12:00", duration=60),
         BreakConfig(name="Pause Après-midi", start_time="15:00", duration=15)
     ])
+    auto_start_at_day_begin: bool = False
     auto_resume_after_break: bool = True
     auto_resume_after_takt: bool = True
     sound_alerts: SoundAlertConfig = Field(default_factory=SoundAlertConfig)
@@ -187,6 +192,7 @@ class ProductionLineUpdate(BaseModel):
     team_config: Optional[TeamConfig] = None
     shift_organization: Optional[ShiftOrganization] = None
     breaks: Optional[List[BreakConfig]] = None
+    auto_start_at_day_begin: Optional[bool] = None
     auto_resume_after_break: Optional[bool] = None
     auto_resume_after_takt: Optional[bool] = None
     sound_alerts: Optional[SoundAlertConfig] = None
@@ -233,9 +239,11 @@ class TaktStatistics(BaseModel):
 # ==================== HELPER FUNCTIONS ====================
 
 def get_day_schedule(line: dict, day_name: str = None) -> dict:
-    """Get schedule for a specific day"""
+    """Get schedule for a specific day using Paris timezone"""
     if day_name is None:
-        day_name = datetime.now(timezone.utc).strftime('%A').lower()
+        # Use Paris timezone to determine the current day
+        paris_now = datetime.now(PARIS_TZ)
+        day_name = paris_now.strftime('%A').lower()
     
     team_config = line.get('team_config', {})
     weekly_schedule = team_config.get('weekly_schedule', {})
@@ -254,6 +262,62 @@ def get_day_schedule(line: dict, day_name: str = None) -> dict:
         'is_working_day': day_schedule.get('is_working_day', True),
         'breaks': day_schedule.get('breaks', line.get('breaks', []))
     }
+
+def get_current_paris_time() -> datetime:
+    """Get current time in Paris timezone"""
+    return datetime.now(PARIS_TZ)
+
+def get_current_paris_day() -> str:
+    """Get current day name in Paris timezone (lowercase)"""
+    return datetime.now(PARIS_TZ).strftime('%A').lower()
+
+def time_to_minutes(time_str: str) -> int:
+    """Convert time string (HH:MM) to minutes since midnight"""
+    if not time_str:
+        return 0
+    parts = time_str.split(':')
+    return int(parts[0]) * 60 + int(parts[1])
+
+def is_time_in_shift(current_time_str: str, shift_start: str, shift_end: str) -> bool:
+    """Check if current time is within a shift's working hours"""
+    current_min = time_to_minutes(current_time_str)
+    start_min = time_to_minutes(shift_start)
+    end_min = time_to_minutes(shift_end)
+    
+    # Handle overnight shifts (e.g., 22:00 - 06:00)
+    if end_min < start_min:
+        return current_min >= start_min or current_min < end_min
+    return start_min <= current_min < end_min
+
+def get_active_team_for_current_time(line: dict) -> Optional[dict]:
+    """Get the active team based on current Paris time"""
+    shift_org = line.get('shift_organization', {})
+    teams = shift_org.get('teams', [])
+    
+    if not teams:
+        return None
+    
+    # Get current Paris time
+    paris_now = get_current_paris_time()
+    current_time_str = paris_now.strftime('%H:%M')
+    
+    # First, check if there's a manually set active team
+    active_team_id = shift_org.get('active_team_id')
+    if active_team_id:
+        for team in teams:
+            if team.get('id') == active_team_id:
+                return team
+    
+    # Otherwise, find team based on current time
+    for team in teams:
+        if team.get('is_active', True):
+            shift_start = team.get('day_start', '08:00')
+            shift_end = team.get('day_end', '17:00')
+            if is_time_in_shift(current_time_str, shift_start, shift_end):
+                return team
+    
+    # Fallback to first team
+    return teams[0] if teams else None
 
 def calculate_estimated_takts(line: dict, day_name: str = None) -> int:
     """Calculate estimated number of takts for the day"""
@@ -321,6 +385,19 @@ async def log_takt_event(
 @api_router.get("/")
 async def root():
     return {"message": "Takt Time API v2"}
+
+@api_router.get("/server-time")
+async def get_server_time():
+    """Get current server time in UTC and Paris timezone"""
+    utc_now = datetime.now(timezone.utc)
+    paris_now = datetime.now(PARIS_TZ)
+    return {
+        "utc": utc_now.isoformat(),
+        "paris": paris_now.isoformat(),
+        "paris_day": paris_now.strftime('%A').lower(),
+        "paris_time": paris_now.strftime('%H:%M'),
+        "timezone": "Europe/Paris"
+    }
 
 @api_router.post("/sites", response_model=dict)
 async def create_site(site_data: SiteCreate):
@@ -504,6 +581,11 @@ async def start_takt(line_id: str):
     state = line.get('state', {})
     current_status = state.get('status', 'idle')
     now = datetime.now(timezone.utc)
+    paris_now = get_current_paris_time()
+    
+    # Get the active team based on current Paris time
+    active_team = get_active_team_for_current_time(line)
+    takt_duration = active_team.get('takt_duration', 30) if active_team else line.get('takt_duration', 30)
     
     if current_status == 'paused' or current_status == 'break':
         # When resuming, set takt_start_time to NOW and keep elapsed_seconds as the base
@@ -528,14 +610,25 @@ async def start_takt(line_id: str):
         }
         await log_takt_event(
             line_id, line.get('site_id', ''), 'takt_start', new_takt,
-            expected_duration_seconds=line.get('takt_duration', 30) * 60
+            expected_duration_seconds=takt_duration * 60,
+            details={
+                "active_team": active_team.get('name') if active_team else None,
+                "paris_time": paris_now.strftime('%H:%M'),
+                "paris_day": paris_now.strftime('%A')
+            }
         )
     
     await db.production_lines.update_one({"id": line_id}, {"$set": {"state": new_state}})
     updated = await db.production_lines.find_one({"id": line_id}, {"_id": 0})
     await manager.broadcast(line_id, {"type": "state_update", "data": updated})
     
-    return {"message": "Takt started", "state": new_state}
+    return {
+        "message": "Takt started", 
+        "state": new_state,
+        "active_team": active_team.get('name') if active_team else None,
+        "takt_duration": takt_duration,
+        "paris_time": paris_now.strftime('%H:%M')
+    }
 
 @api_router.post("/lines/{line_id}/pause")
 async def pause_takt(line_id: str):

@@ -28,6 +28,17 @@ import {
   Alert,
   AlertDescription,
 } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import {
   ArrowLeft,
@@ -95,8 +106,8 @@ const validateTeam = (team) => {
   }
   
   // Validate takt duration
-  if (team.takt_duration < 20 || team.takt_duration > 40) {
-    errors.push("La durée du takt doit être entre 20 et 40 minutes");
+  if (team.takt_duration < 20 || team.takt_duration > 90) {
+    errors.push("La durée du takt doit être entre 20 et 90 minutes");
   }
   
   // Validate breaks
@@ -171,8 +182,10 @@ const createDefaultBreak = (index) => ({
 export default function LineConfig() {
   const { lineId } = useParams();
   const navigate = useNavigate();
-  const { sites, fetchSites, fetchLine, createLine, updateLine } = useTakt();
+  const { sites, fetchSites, fetchLine, createLine, updateLine, deleteLine } = useTakt();
   const isNew = !lineId || lineId === 'new';
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -211,6 +224,7 @@ export default function LineConfig() {
       ],
       active_team_id: null,
     },
+    auto_start_at_day_begin: false,
     auto_resume_after_break: true,
     auto_resume_after_takt: true,
   });
@@ -273,6 +287,7 @@ export default function LineConfig() {
         site_id: data.site_id || '',
         takt_duration: data.takt_duration || 30,
         shift_organization: shiftOrg,
+        auto_start_at_day_begin: data.auto_start_at_day_begin ?? false,
         auto_resume_after_break: data.auto_resume_after_break ?? true,
         auto_resume_after_takt: data.auto_resume_after_takt ?? true,
       });
@@ -482,6 +497,20 @@ export default function LineConfig() {
       },
     }));
     toast.success('Équipe supprimée');
+  };
+
+  const handleDeleteLine = async () => {
+    setDeleting(true);
+    try {
+      await deleteLine(lineId);
+      toast.success('Ligne supprimée avec succès');
+      navigate('/');
+    } catch (err) {
+      toast.error('Erreur lors de la suppression de la ligne');
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
   };
 
   const setActiveTeam = (teamId) => {
@@ -723,7 +752,17 @@ export default function LineConfig() {
                 <CardTitle className="text-lg text-slate-100">Options globales</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-slate-900/50 border border-slate-700">
+                    <div>
+                      <p className="font-medium text-slate-300">Démarrage auto en début de journée</p>
+                      <p className="text-xs text-slate-500 mt-1">Le takt démarre automatiquement à l'heure de début</p>
+                    </div>
+                    <Switch
+                      checked={formData.auto_start_at_day_begin}
+                      onCheckedChange={(checked) => setFormData({ ...formData, auto_start_at_day_begin: checked })}
+                    />
+                  </div>
                   <div className="flex items-center justify-between p-4 rounded-lg bg-slate-900/50 border border-slate-700">
                     <div>
                       <p className="font-medium text-slate-300">Reprise auto après pause</p>
@@ -737,7 +776,7 @@ export default function LineConfig() {
                   <div className="flex items-center justify-between p-4 rounded-lg bg-slate-900/50 border border-slate-700">
                     <div>
                       <p className="font-medium text-slate-300">Passage auto au takt suivant</p>
-                      <p className="text-xs text-slate-500 mt-1">Enchaîne automatiquement les takts</p>
+                      <p className="text-xs text-slate-500 mt-1">Enchaîne automatiquement les takts (pas de temps dépassé)</p>
                     </div>
                     <Switch
                       checked={formData.auto_resume_after_takt}
@@ -788,6 +827,46 @@ export default function LineConfig() {
               <Save className="h-5 w-5 mr-2" />
               {saving ? 'Enregistrement...' : 'Enregistrer'}
             </Button>
+
+            {/* Delete Line Button - Only show for existing lines */}
+            {!isNew && (
+              <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12 border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300 mt-3"
+                    data-testid="delete-line-btn"
+                  >
+                    <Trash2 className="h-5 w-5 mr-2" />
+                    Supprimer la ligne
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-slate-800 border-slate-700">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-slate-100">
+                      Supprimer la ligne ?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-slate-400">
+                      Cette action est irréversible. La ligne "{formData.name}" et tous ses écrans associés seront définitivement supprimés.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="border-slate-600 text-slate-300 hover:bg-slate-700">
+                      Annuler
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteLine}
+                      disabled={deleting}
+                      className="bg-red-600 hover:bg-red-500 text-white"
+                      data-testid="confirm-delete-btn"
+                    >
+                      {deleting ? 'Suppression...' : 'Supprimer'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
         </div>
       </form>
@@ -868,19 +947,19 @@ export default function LineConfig() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Timer className="h-4 w-4 text-green-400" />
-                  <Label className="text-slate-300">Durée du Takt (20-40 min)</Label>
+                  <Label className="text-slate-300">Durée du Takt (20-90 min)</Label>
                 </div>
                 <Slider
                   value={[editingTeam.takt_duration]}
                   onValueChange={([val]) => setEditingTeam({ ...editingTeam, takt_duration: val })}
                   min={20}
-                  max={40}
+                  max={90}
                   step={1}
                 />
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">20 min</span>
                   <span className="text-xl font-mono font-bold text-green-400">{editingTeam.takt_duration} min</span>
-                  <span className="text-slate-500">40 min</span>
+                  <span className="text-slate-500">90 min</span>
                 </div>
               </div>
 

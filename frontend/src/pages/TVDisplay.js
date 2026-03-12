@@ -11,10 +11,9 @@ import {
   Coffee,
   Play,
   Pause,
-  Square,
-  SkipForward,
   Volume2,
   VolumeX,
+  Square,
 } from 'lucide-react';
 
 const StatusBadge = ({ status }) => {
@@ -43,12 +42,15 @@ const StatusBadge = ({ status }) => {
 
 export default function TVDisplay() {
   const { lineId } = useParams();
-  const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, stopTakt, nextTakt } = useTakt();
+  const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, nextTakt } = useTakt();
   const [line, setLine] = useState(null);
   const [loading, setLoading] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const controlsTimeout = useRef(null);
+
+  // Check if auto-start is enabled
+  const autoStartEnabled = line?.auto_start_at_day_begin ?? false;
 
   const handleWarning = useCallback(() => {
     if (audioEnabled && line?.sound_alerts?.minutes_before_takt_end) {
@@ -82,6 +84,29 @@ export default function TVDisplay() {
     estimatedTakts,
     isOvertime,
   } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext);
+
+  // Don't show overtime if auto-next is enabled
+  const showOvertime = isOvertime && !line?.auto_resume_after_takt;
+
+  // Get the active team's schedule for display
+  const getActiveTeamSchedule = () => {
+    const shiftOrg = line?.shift_organization;
+    if (shiftOrg?.teams?.length > 0) {
+      const activeTeamId = shiftOrg.active_team_id;
+      const activeTeam = activeTeamId 
+        ? shiftOrg.teams.find(t => t.id === activeTeamId)
+        : shiftOrg.teams[0];
+      if (activeTeam) {
+        return {
+          start: activeTeam.day_start || '08:00',
+          end: activeTeam.day_end || '17:00'
+        };
+      }
+    }
+    return { start: '08:00', end: '17:00' };
+  };
+
+  const schedule = getActiveTeamSchedule();
 
   useEffect(() => {
     loadLine();
@@ -141,16 +166,6 @@ export default function TVDisplay() {
     await loadLine();
   };
 
-  const handleStop = async () => {
-    await stopTakt(lineId);
-    await loadLine();
-  };
-
-  const handleNext = async () => {
-    await nextTakt(lineId);
-    await loadLine();
-  };
-
   if (loading) {
     return (
       <div className="tv-container h-screen w-screen flex items-center justify-center">
@@ -167,7 +182,7 @@ export default function TVDisplay() {
     );
   }
 
-  const timerColor = isOvertime 
+  const timerColor = showOvertime 
     ? 'text-red-400' 
     : status === 'running' 
       ? 'text-green-400' 
@@ -175,7 +190,7 @@ export default function TVDisplay() {
         ? 'text-yellow-400'
         : 'text-slate-300';
 
-  const progressColor = isOvertime
+  const progressColor = showOvertime
     ? 'from-red-500 to-red-600'
     : progressPercentage > 80
       ? 'from-yellow-500 to-orange-500'
@@ -282,7 +297,7 @@ export default function TVDisplay() {
               <span className="text-slate-400 uppercase tracking-wider text-sm">Horaires</span>
             </div>
             <div className="text-3xl md:text-4xl font-mono text-white">
-              {line.day_start} - {line.day_end}
+              {schedule.start} - {schedule.end}
             </div>
           </div>
 
@@ -311,17 +326,9 @@ export default function TVDisplay() {
           showControls ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
         }`}
       >
-        {status === 'idle' || status === 'finished' ? (
-          <Button 
-            onClick={handleStart}
-            className="h-16 px-8 btn-start text-white font-bold text-xl"
-            data-testid="tv-start-btn"
-          >
-            <Play className="h-6 w-6 mr-3" />
-            Démarrer
-          </Button>
-        ) : status === 'running' ? (
-          <>
+        {autoStartEnabled ? (
+          /* Auto-start enabled: only Pause/Resume */
+          status === 'running' ? (
             <Button 
               onClick={handlePause}
               className="h-16 px-8 btn-pause text-slate-900 font-bold text-xl"
@@ -330,34 +337,51 @@ export default function TVDisplay() {
               <Pause className="h-6 w-6 mr-3" />
               Suspendre
             </Button>
+          ) : status === 'paused' || status === 'break' ? (
             <Button 
-              onClick={handleNext}
-              variant="outline"
-              className="h-16 px-6 border-2 border-slate-600 text-slate-300 hover:bg-slate-700"
-              data-testid="tv-next-btn"
+              onClick={handleStart}
+              className="h-16 px-8 btn-start text-white font-bold text-xl"
+              data-testid="tv-resume-btn"
             >
-              <SkipForward className="h-6 w-6" />
+              <Play className="h-6 w-6 mr-3" />
+              Reprendre
             </Button>
-          </>
+          ) : (
+            <div className="h-16 px-8 flex items-center text-xl text-slate-500">
+              Démarrage auto à {schedule.start}
+            </div>
+          )
         ) : (
-          <Button 
-            onClick={handleStart}
-            className="h-16 px-8 btn-start text-white font-bold text-xl"
-            data-testid="tv-resume-btn"
-          >
-            <Play className="h-6 w-6 mr-3" />
-            Reprendre
-          </Button>
+          /* Auto-start disabled: Start/Pause/Resume */
+          status === 'idle' || status === 'finished' ? (
+            <Button 
+              onClick={handleStart}
+              className="h-16 px-8 btn-start text-white font-bold text-xl"
+              data-testid="tv-start-btn"
+            >
+              <Play className="h-6 w-6 mr-3" />
+              Démarrer
+            </Button>
+          ) : status === 'running' ? (
+            <Button 
+              onClick={handlePause}
+              className="h-16 px-8 btn-pause text-slate-900 font-bold text-xl"
+              data-testid="tv-pause-btn"
+            >
+              <Pause className="h-6 w-6 mr-3" />
+              Suspendre
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleStart}
+              className="h-16 px-8 btn-start text-white font-bold text-xl"
+              data-testid="tv-resume-btn"
+            >
+              <Play className="h-6 w-6 mr-3" />
+              Reprendre
+            </Button>
+          )
         )}
-        <Button 
-          onClick={handleStop}
-          variant="outline"
-          className="h-16 px-6 border-2 border-red-600/50 text-red-400 hover:bg-red-500/20"
-          disabled={status === 'idle'}
-          data-testid="tv-stop-btn"
-        >
-          <Square className="h-6 w-6" />
-        </Button>
       </div>
 
       {/* Audio Enable Overlay */}

@@ -14,17 +14,16 @@ import {
 import {
   Play,
   Pause,
-  Square,
   Settings,
   Tv,
   Plus,
   Factory,
   Clock,
   Timer,
-  SkipForward,
   Building2,
   BarChart3,
-  Monitor,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useTaktTimer } from '@/hooks/useTaktTimer';
 
@@ -52,7 +51,11 @@ const StatusBadge = ({ status }) => {
 
 const LineCard = ({ line }) => {
   const navigate = useNavigate();
-  const { startTakt, pauseTakt, stopTakt, nextTakt, enableAudio, playSound } = useTakt();
+  const { startTakt, pauseTakt, enableAudio, playSound, nextTakt } = useTakt();
+  const [copied, setCopied] = useState(false);
+
+  // Check if auto-start is enabled
+  const autoStartEnabled = line?.auto_start_at_day_begin ?? false;
 
   const handleAutoNext = async () => {
     if (line?.auto_resume_after_takt) {
@@ -79,6 +82,9 @@ const LineCard = ({ line }) => {
     handleAutoNext
   );
 
+  // Don't show overtime if auto-next is enabled
+  const showOvertime = isOvertime && !line?.auto_resume_after_takt;
+
   const handleStart = async () => {
     enableAudio();
     await startTakt(line.id);
@@ -88,12 +94,33 @@ const LineCard = ({ line }) => {
     await pauseTakt(line.id);
   };
 
-  const handleStop = async () => {
-    await stopTakt(line.id);
+  // Get the active team's schedule for display
+  const getActiveTeamSchedule = () => {
+    const shiftOrg = line?.shift_organization;
+    if (shiftOrg?.teams?.length > 0) {
+      const activeTeamId = shiftOrg.active_team_id;
+      const activeTeam = activeTeamId 
+        ? shiftOrg.teams.find(t => t.id === activeTeamId)
+        : shiftOrg.teams[0];
+      if (activeTeam) {
+        return {
+          start: activeTeam.day_start || '08:00',
+          end: activeTeam.day_end || '17:00'
+        };
+      }
+    }
+    return { start: '08:00', end: '17:00' };
   };
 
-  const handleNext = async () => {
-    await nextTakt(line.id);
+  const schedule = getActiveTeamSchedule();
+
+  // Generate TV URL
+  const tvUrl = `${window.location.origin}/tv/${line.id}`;
+
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(tvUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const cardGlow = status === 'running' ? 'card-glow-running' : status === 'paused' || status === 'break' ? 'card-glow-paused' : '';
@@ -131,7 +158,7 @@ const LineCard = ({ line }) => {
             </div>
             <div className="p-2 rounded-lg bg-slate-900/50 border border-slate-700">
               <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">Restant</p>
-              <p className={`text-lg font-mono font-bold ${isOvertime ? 'text-red-400' : 'text-green-400'}`} data-testid="remaining-time">
+              <p className={`text-lg font-mono font-bold ${showOvertime ? 'text-red-400' : 'text-green-400'}`} data-testid="remaining-time">
                 {remainingFormatted}
               </p>
             </div>
@@ -142,7 +169,7 @@ const LineCard = ({ line }) => {
             <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden">
               <div 
                 className={`h-full rounded-full transition-all duration-1000 ${
-                  isOvertime ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-cyan-400'
+                  showOvertime ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-cyan-400'
                 }`}
                 style={{ width: `${Math.min(100, progressPercentage)}%` }}
               />
@@ -157,29 +184,15 @@ const LineCard = ({ line }) => {
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              <span>{line.team_config?.weekly_schedule?.monday?.day_start || '08:00'} - {line.team_config?.weekly_schedule?.monday?.day_end || '17:00'}</span>
+              <span>{schedule.start} - {schedule.end}</span>
             </div>
-            {line.screen_count > 0 && (
-              <div className="flex items-center gap-1">
-                <Monitor className="h-3 w-3" />
-                <span>{line.screen_count} écran(s)</span>
-              </div>
-            )}
           </div>
 
           {/* Control Buttons */}
           <div className="flex gap-1.5">
-            {status === 'idle' || status === 'finished' ? (
-              <Button 
-                onClick={handleStart}
-                className="flex-1 h-9 btn-start text-white font-semibold btn-control text-sm"
-                data-testid="start-btn"
-              >
-                <Play className="h-3.5 w-3.5 mr-1.5" />
-                Démarrer
-              </Button>
-            ) : status === 'running' ? (
-              <>
+            {autoStartEnabled ? (
+              /* Auto-start enabled: only Pause/Resume buttons */
+              status === 'running' ? (
                 <Button 
                   onClick={handlePause}
                   className="flex-1 h-9 btn-pause text-slate-900 font-semibold btn-control text-sm"
@@ -188,34 +201,51 @@ const LineCard = ({ line }) => {
                   <Pause className="h-3.5 w-3.5 mr-1.5" />
                   Suspendre
                 </Button>
+              ) : status === 'paused' || status === 'break' ? (
                 <Button 
-                  onClick={handleNext}
-                  variant="outline"
-                  className="h-9 px-2 border-slate-600 text-slate-300 hover:bg-slate-700 btn-control"
-                  data-testid="next-btn"
+                  onClick={handleStart}
+                  className="flex-1 h-9 btn-start text-white font-semibold btn-control text-sm"
+                  data-testid="resume-btn"
                 >
-                  <SkipForward className="h-3.5 w-3.5" />
+                  <Play className="h-3.5 w-3.5 mr-1.5" />
+                  Reprendre
                 </Button>
-              </>
+              ) : (
+                <div className="flex-1 h-9 flex items-center justify-center text-sm text-slate-500">
+                  Démarrage auto à {schedule.start}
+                </div>
+              )
             ) : (
-              <Button 
-                onClick={handleStart}
-                className="flex-1 h-9 btn-start text-white font-semibold btn-control text-sm"
-                data-testid="resume-btn"
-              >
-                <Play className="h-3.5 w-3.5 mr-1.5" />
-                Reprendre
-              </Button>
+              /* Auto-start disabled: Start/Pause/Resume buttons */
+              status === 'idle' || status === 'finished' ? (
+                <Button 
+                  onClick={handleStart}
+                  className="flex-1 h-9 btn-start text-white font-semibold btn-control text-sm"
+                  data-testid="start-btn"
+                >
+                  <Play className="h-3.5 w-3.5 mr-1.5" />
+                  Démarrer
+                </Button>
+              ) : status === 'running' ? (
+                <Button 
+                  onClick={handlePause}
+                  className="flex-1 h-9 btn-pause text-slate-900 font-semibold btn-control text-sm"
+                  data-testid="pause-btn"
+                >
+                  <Pause className="h-3.5 w-3.5 mr-1.5" />
+                  Suspendre
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleStart}
+                  className="flex-1 h-9 btn-start text-white font-semibold btn-control text-sm"
+                  data-testid="resume-btn"
+                >
+                  <Play className="h-3.5 w-3.5 mr-1.5" />
+                  Reprendre
+                </Button>
+              )
             )}
-            <Button 
-              onClick={handleStop}
-              variant="outline"
-              className="h-9 px-2 border-red-600/50 text-red-400 hover:bg-red-500/20 btn-control"
-              disabled={status === 'idle'}
-              data-testid="stop-btn"
-            >
-              <Square className="h-3.5 w-3.5" />
-            </Button>
           </div>
 
           {/* Action Links */}
@@ -234,21 +264,21 @@ const LineCard = ({ line }) => {
               variant="ghost" 
               size="sm"
               className="flex-1 h-8 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700 px-2"
-              onClick={() => navigate(`/screens/${line.id}`)}
-              data-testid="screens-btn"
-            >
-              <Monitor className="h-3 w-3 mr-1" />
-              Écrans
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              className="flex-1 h-8 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700 px-2"
               onClick={() => window.open(`/tv/${line.id}`, '_blank')}
               data-testid="tv-btn"
             >
               <Tv className="h-3 w-3 mr-1" />
               TV
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="flex-1 h-8 text-xs text-slate-400 hover:text-slate-100 hover:bg-slate-700 px-2"
+              onClick={handleCopyUrl}
+              data-testid="copy-url-btn"
+            >
+              {copied ? <Check className="h-3 w-3 mr-1 text-green-400" /> : <Copy className="h-3 w-3 mr-1" />}
+              {copied ? 'Copié' : 'URL'}
             </Button>
             <Button 
               variant="ghost" 
