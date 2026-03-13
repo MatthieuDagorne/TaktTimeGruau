@@ -943,7 +943,7 @@ async def stop_takt(line_id: str):
         "current_takt": 0,
         "takt_start_time": None,
         "elapsed_seconds": 0,
-        "paused_at": None,
+        "paused_at": datetime.now(timezone.utc).isoformat(),  # Track when stopped for display
         # Clear carryover when stopping
         "carryover_takt": None,
         "carryover_elapsed_seconds": None,

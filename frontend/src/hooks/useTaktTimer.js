@@ -60,6 +60,7 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [breakRemainingSeconds, setBreakRemainingSeconds] = useState(0);
+  const [stopTimeSeconds, setStopTimeSeconds] = useState(0);
   const [pendingBreak, setPendingBreak] = useState(null);
   const intervalRef = useRef(null);
   const warningTriggeredForTakt = useRef(null);
@@ -114,6 +115,23 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
     const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
     return remaining;
   }, [status, state.break_end_time]);
+
+  // Calculate stop time (time since paused)
+  const calculateStopTime = useCallback(() => {
+    if (status !== 'paused' && status !== 'idle') {
+      return 0;
+    }
+    
+    // Use paused_at timestamp if available
+    if (state.paused_at) {
+      const pausedTime = new Date(state.paused_at).getTime();
+      const now = Date.now();
+      const stopTime = Math.floor((now - pausedTime) / 1000);
+      return stopTime;
+    }
+    
+    return 0;
+  }, [status, state.paused_at]);
 
   // Check for scheduled breaks
   const checkScheduledBreaks = useCallback(() => {
@@ -191,10 +209,12 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
       const elapsed = calculateElapsed();
       const remaining = Math.max(0, taktDurationSeconds - elapsed);
       const breakRemaining = calculateBreakRemaining();
+      const stopTime = calculateStopTime();
       
       setElapsedSeconds(elapsed);
       setRemainingSeconds(remaining);
       setBreakRemainingSeconds(breakRemaining);
+      setStopTimeSeconds(stopTime);
 
       // Check for end of day - only when running or paused
       if ((status === 'running' || status === 'paused' || status === 'break') && !dayEndTriggeredRef.current) {
@@ -300,7 +320,7 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
         clearInterval(intervalRef.current);
       }
     };
-  }, [line, status, currentTakt, state.takt_start_time, state.elapsed_seconds, state.break_end_time, taktDurationSeconds, dayEnd, calculateElapsed, calculateBreakRemaining, checkScheduledBreaks, onWarning, onComplete, onAutoNext, onBreakStart, onDayEnd, onAutoResumeAfterBreak, autoResumeAfterTakt, autoResumeAfterBreak, pendingBreak]);
+  }, [line, status, currentTakt, state.takt_start_time, state.elapsed_seconds, state.break_end_time, state.paused_at, taktDurationSeconds, dayEnd, calculateElapsed, calculateBreakRemaining, calculateStopTime, checkScheduledBreaks, onWarning, onComplete, onAutoNext, onBreakStart, onDayEnd, onAutoResumeAfterBreak, autoResumeAfterTakt, autoResumeAfterBreak, pendingBreak]);
 
   const progressPercentage = taktDurationSeconds > 0 
     ? Math.min(100, (elapsedSeconds / taktDurationSeconds) * 100)
@@ -325,5 +345,8 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
     currentBreakName: state.current_break_name || null,
     breakDurationMinutes: state.break_duration_minutes || 0,
     pendingBreak,
+    // Stop time data
+    stopTimeSeconds,
+    stopTimeFormatted: formatTime(stopTimeSeconds),
   };
 };

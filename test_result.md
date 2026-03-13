@@ -102,7 +102,9 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Bug fix - Le reliquat du takt de la période précédente au démarrage auto tourne en boucle"
+user_problem_statement: |
+  1. Bug fix - Le reliquat du takt de la période précédente au démarrage auto tourne en boucle
+  2. Feature - Afficher le temps d'arrêt sur l'écran TV (depuis combien de temps la ligne est arrêtée/suspendue)
 
 backend:
   - task: "Fix infinite loop bug in auto-start with carryover"
@@ -135,6 +137,71 @@ backend:
           Fichiers modifiés:
           - /app/backend/server.py (lignes 729-753, 787-801, 839-877, 1059-1069, 941-949)
 
+  - task: "Track stop time when line is paused or stopped"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Ajout de l'enregistrement du timestamp paused_at lors de l'arrêt complet (stop_takt).
+          Cela permet au frontend de calculer et afficher le temps d'arrêt.
+          
+          Modification:
+          - stop_takt(): paused_at maintenant enregistre datetime.now() au lieu de None
+          
+          Fichiers modifiés:
+          - /app/backend/server.py (ligne 946)
+
+frontend:
+  - task: "Display stop time on TV screen"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/TVDisplay.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Ajout d'un affichage du temps d'arrêt sur l'écran TV, similaire au compte à rebours des pauses.
+          
+          Fonctionnalités:
+          1. Calcul du temps d'arrêt depuis paused_at
+          2. Affichage dans une boîte rouge avec compte à rebours
+          3. Affiché uniquement quand status = 'paused' ou 'idle' ET stopTimeSeconds > 0
+          4. Texte adapté: "LIGNE SUSPENDUE" pour paused, "LIGNE ARRÊTÉE" pour idle
+          
+          Fichiers modifiés:
+          - /app/frontend/src/pages/TVDisplay.js (lignes 117-132, 345-361)
+
+  - task: "Calculate stop time in useTaktTimer hook"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/hooks/useTaktTimer.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Ajout du calcul du temps d'arrêt dans le hook useTaktTimer.
+          
+          Fonctionnalités:
+          1. Nouvelle fonction calculateStopTime() qui calcule le temps écoulé depuis paused_at
+          2. Nouveau state stopTimeSeconds mis à jour chaque seconde
+          3. Export de stopTimeSeconds et stopTimeFormatted
+          4. Actif uniquement pour status 'paused' ou 'idle'
+          
+          Fichiers modifiés:
+          - /app/frontend/src/hooks/useTaktTimer.js (lignes 61, 119-133, 195-198, 303, 335-337)
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
@@ -144,6 +211,7 @@ metadata:
 test_plan:
   current_focus:
     - "Fix infinite loop bug in auto-start with carryover"
+    - "Display stop time on TV screen"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -167,3 +235,24 @@ agent_communication:
       3. Appeler auto_start plusieurs fois et vérifier qu'il n'y a pas de boucle
       4. Vérifier que le carryover est bien effacé après le premier auto_start
       5. Vérifier que les appels suivants à check_auto_start ne retournent plus le carryover
+  
+  - agent: "main"
+    message: |
+      Nouvelle fonctionnalité: Affichage du temps d'arrêt sur l'écran TV.
+      
+      Implémentation:
+      1. Backend: Enregistre le timestamp paused_at lors de l'arrêt (stop_takt)
+      2. Frontend Hook: Calcule le temps écoulé depuis paused_at en temps réel
+      3. Frontend UI: Affiche une boîte rouge avec le temps d'arrêt formaté (MM:SS ou HH:MM:SS)
+      
+      Affichage:
+      - Visible quand status = 'paused' ou 'idle' ET stopTimeSeconds > 0
+      - Boîte rouge similaire au compte à rebours des pauses
+      - Texte adapté selon le statut: "LIGNE SUSPENDUE" ou "LIGNE ARRÊTÉE"
+      - Met à jour chaque seconde automatiquement
+      
+      Tests à effectuer:
+      1. Démarrer un takt et le mettre en pause → vérifier affichage temps d'arrêt
+      2. Arrêter complètement la ligne → vérifier affichage temps d'arrêt
+      3. Vérifier que le compteur augmente chaque seconde
+      4. Reprendre la ligne → vérifier que l'affichage disparaît

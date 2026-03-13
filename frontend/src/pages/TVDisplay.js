@@ -127,6 +127,8 @@ export default function TVDisplay() {
     breakRemainingSeconds,
     currentBreakName,
     breakDurationMinutes,
+    stopTimeSeconds,
+    stopTimeFormatted,
   } = useTaktTimer(line, handleWarning, handleComplete, handleAutoNext, handleBreakStart, handleDayEnd, handleAutoResumeAfterBreak);
 
   // Don't show overtime if auto-next is enabled
@@ -338,6 +340,24 @@ export default function TVDisplay() {
                 {breakRemainingFormatted}
               </div>
               <p className="text-lg text-orange-400/80">Temps de pause restant</p>
+            </div>
+          </div>
+        )}
+
+        {/* Stop Time Display - shown when paused or idle (with paused_at) */}
+        {(status === 'paused' || status === 'idle') && stopTimeSeconds > 0 && (
+          <div className="w-full max-w-3xl mb-6 p-8 rounded-3xl bg-red-500/20 border-2 border-red-400" data-testid="tv-stop-time-display">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <div className="flex items-center gap-3">
+                <Pause className="h-8 w-8 text-red-400" />
+                <span className="text-xl md:text-2xl text-red-400 font-bold uppercase tracking-wider">
+                  {status === 'paused' ? 'LIGNE SUSPENDUE' : 'LIGNE ARRÊTÉE'}
+                </span>
+              </div>
+              <div className="text-[12vw] md:text-[14vw] font-mono font-bold text-red-400 leading-none py-2" data-testid="tv-stop-time-counter">
+                {stopTimeFormatted}
+              </div>
+              <p className="text-lg text-red-400/80">Temps d'arrêt</p>
             </div>
           </div>
         )}
