@@ -1092,6 +1092,12 @@ async def start_break(line_id: str, break_name: str = "Pause", break_duration: i
         raise HTTPException(status_code=404, detail="Line not found")
     
     state = line.get('state', {})
+    current_status = state.get('status', 'idle')
+    
+    # Prevent starting a break if already in break status
+    if current_status == 'break':
+        return {"message": "Already in break", "state": state}
+    
     now = datetime.now(timezone.utc)
     
     elapsed = state.get('elapsed_seconds', 0)

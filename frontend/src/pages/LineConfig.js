@@ -106,8 +106,8 @@ const validateTeam = (team) => {
   }
   
   // Validate takt duration
-  if (team.takt_duration < 20 || team.takt_duration > 90) {
-    errors.push("La durée du takt doit être entre 20 et 90 minutes");
+  if (team.takt_duration < 5 || team.takt_duration > 90) {
+    errors.push("La durée du takt doit être entre 5 et 90 minutes");
   }
   
   // Validate breaks
@@ -1044,12 +1044,12 @@ export default function LineConfig() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Timer className="h-4 w-4 text-green-400" />
-                  <Label className="text-slate-300">Durée du Takt (20-90 min)</Label>
+                  <Label className="text-slate-300">Durée du Takt (5-90 min)</Label>
                 </div>
                 <Slider
                   value={[editingTeam.takt_duration]}
                   onValueChange={([val]) => setEditingTeam({ ...editingTeam, takt_duration: val })}
-                  min={20}
+                  min={5}
                   max={90}
                   step={1}
                 />

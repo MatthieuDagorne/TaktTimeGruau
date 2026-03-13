@@ -105,6 +105,11 @@
 user_problem_statement: |
   1. Bug fix - Le reliquat du takt de la période précédente au démarrage auto tourne en boucle
   2. Feature - Afficher le temps d'arrêt sur l'écran TV (depuis combien de temps la ligne est arrêtée/suspendue)
+  3. Sujet 1 - Durée minimale des takts : 20min → 5min
+  4. Sujet 2 - Retirer colonne "Statut" dans l'historique des événements (doublon avec "Type")
+  5. Sujet 3 - Problème responsive écran TV avec pauses/suspension
+  6. Sujet 4 - Bug changement de takt lors reprise après pause (takt non terminé)
+  7. Sujet 5 - Double événement "Début pause" avec 1s d'écart
 
 backend:
   - task: "Fix infinite loop bug in auto-start with carryover"

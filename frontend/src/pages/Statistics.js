@@ -313,7 +313,6 @@ export default function Statistics() {
                         <TableHead className="text-slate-400">N° Takt</TableHead>
                         <TableHead className="text-slate-400">Durée Takt</TableHead>
                         <TableHead className="text-slate-400">Temps Arrêt</TableHead>
-                        <TableHead className="text-slate-400">Statut</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -359,25 +358,6 @@ export default function Statistics() {
                                   {pauseDuration !== null ? formatDuration(pauseDuration) : 'En cours...'}
                                 </span>
                               ) : '-'}
-                            </TableCell>
-                            <TableCell>
-                              {event.is_overtime ? (
-                                <span className="text-red-400 font-mono">
-                                  Retard +{formatDuration(event.overtime_seconds)}
-                                </span>
-                              ) : event.event_type === 'takt_end' ? (
-                                <span className="text-green-400">À l'heure</span>
-                              ) : event.event_type === 'takt_start' ? (
-                                <span className="text-blue-400">Démarré</span>
-                              ) : event.event_type === 'takt_resume' ? (
-                                <span className="text-green-400">Repris</span>
-                              ) : event.event_type === 'takt_pause' ? (
-                                <span className="text-yellow-400">Suspendu</span>
-                              ) : event.event_type === 'break_start' ? (
-                                <span className="text-orange-400">En pause</span>
-                              ) : (
-                                '-'
-                              )}
                             </TableCell>
                           </TableRow>
                         );
