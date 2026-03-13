@@ -165,9 +165,11 @@ const defaultTeam = {
   breaks: [], // Start with no breaks, user adds as needed
   sound_alerts: {
     takt_start: true,
+    takt_warning_enabled: true,
     minutes_before_takt_end: 5,
     takt_end: true,
     break_start: true,
+    break_warning_enabled: true,
     minutes_before_break_end: 5,
     break_end: true,
   },
@@ -850,19 +852,34 @@ export default function LineConfig() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-300">Alerte avant fin de takt</span>
-                    <span className="text-sm text-slate-400">{formData.sound_alerts?.minutes_before_takt_end || 5} min</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-300">Alerte avant fin de takt</span>
+                      <Switch
+                        checked={formData.sound_alerts?.takt_warning_enabled ?? true}
+                        onCheckedChange={(checked) => setFormData({
+                          ...formData,
+                          sound_alerts: { ...formData.sound_alerts, takt_warning_enabled: checked }
+                        })}
+                      />
+                    </div>
+                    <span className="text-sm text-slate-400">
+                      {formData.sound_alerts?.takt_warning_enabled !== false 
+                        ? `${formData.sound_alerts?.minutes_before_takt_end || 5} min` 
+                        : 'Désactivé'}
+                    </span>
                   </div>
-                  <Slider
-                    value={[formData.sound_alerts?.minutes_before_takt_end || 5]}
-                    onValueChange={([val]) => setFormData({
-                      ...formData,
-                      sound_alerts: { ...formData.sound_alerts, minutes_before_takt_end: val }
-                    })}
-                    min={1}
-                    max={10}
-                    step={1}
-                  />
+                  {formData.sound_alerts?.takt_warning_enabled !== false && (
+                    <Slider
+                      value={[formData.sound_alerts?.minutes_before_takt_end || 5]}
+                      onValueChange={([val]) => setFormData({
+                        ...formData,
+                        sound_alerts: { ...formData.sound_alerts, minutes_before_takt_end: val }
+                      })}
+                      min={1}
+                      max={10}
+                      step={1}
+                    />
+                  )}
                 </div>
                 <Separator className="bg-slate-700" />
                 <div className="flex items-center justify-between">
@@ -887,19 +904,34 @@ export default function LineConfig() {
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-300">Alerte avant fin de pause</span>
-                    <span className="text-sm text-slate-400">{formData.sound_alerts?.minutes_before_break_end || 5} min</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-300">Alerte avant fin de pause</span>
+                      <Switch
+                        checked={formData.sound_alerts?.break_warning_enabled ?? true}
+                        onCheckedChange={(checked) => setFormData({
+                          ...formData,
+                          sound_alerts: { ...formData.sound_alerts, break_warning_enabled: checked }
+                        })}
+                      />
+                    </div>
+                    <span className="text-sm text-slate-400">
+                      {formData.sound_alerts?.break_warning_enabled !== false 
+                        ? `${formData.sound_alerts?.minutes_before_break_end || 5} min` 
+                        : 'Désactivé'}
+                    </span>
                   </div>
-                  <Slider
-                    value={[formData.sound_alerts?.minutes_before_break_end || 5]}
-                    onValueChange={([val]) => setFormData({
-                      ...formData,
-                      sound_alerts: { ...formData.sound_alerts, minutes_before_break_end: val }
-                    })}
-                    min={1}
-                    max={10}
-                    step={1}
-                  />
+                  {formData.sound_alerts?.break_warning_enabled !== false && (
+                    <Slider
+                      value={[formData.sound_alerts?.minutes_before_break_end || 5]}
+                      onValueChange={([val]) => setFormData({
+                        ...formData,
+                        sound_alerts: { ...formData.sound_alerts, minutes_before_break_end: val }
+                      })}
+                      min={1}
+                      max={10}
+                      step={1}
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>

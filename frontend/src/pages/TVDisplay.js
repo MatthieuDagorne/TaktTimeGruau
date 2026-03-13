@@ -365,9 +365,9 @@ export default function TVDisplay() {
 
         {/* Remaining Time - Main Focus */}
         <div className="text-center mb-8">
-          <p className="text-xl md:text-2xl text-slate-500 uppercase tracking-widest mb-2">Temps Restant</p>
+          <p className="text-3xl md:text-4xl text-slate-400 uppercase tracking-widest mb-4 font-bold">Temps Restant</p>
           <div 
-            className={`tv-timer text-[20vw] md:text-[25vw] leading-none font-bold ${timerColor} ${status === 'running' ? 'timer-active' : ''}`}
+            className={`tv-timer text-[12vw] md:text-[15vw] leading-none font-bold ${timerColor} ${status === 'running' ? 'timer-active' : ''}`}
             data-testid="tv-remaining-time"
           >
             {remainingFormatted}
@@ -376,15 +376,15 @@ export default function TVDisplay() {
 
         {/* Elapsed Time */}
         <div className="text-center mb-12">
-          <p className="text-lg text-slate-600 uppercase tracking-wider mb-1">Temps Écoulé</p>
-          <div className="tv-timer text-4xl md:text-6xl font-bold text-slate-400" data-testid="tv-elapsed-time">
+          <p className="text-2xl md:text-3xl text-slate-500 uppercase tracking-wider mb-2 font-semibold">Temps Écoulé</p>
+          <div className="tv-timer text-6xl md:text-8xl font-bold text-slate-400" data-testid="tv-elapsed-time">
             {elapsedFormatted}
           </div>
         </div>
 
         {/* Progress Bar */}
         <div className="w-full max-w-4xl">
-          <div className="h-4 md:h-6 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+          <div className="h-6 md:h-8 bg-slate-800 rounded-full overflow-hidden border-2 border-slate-700">
             <div 
               className={`h-full bg-gradient-to-r ${progressColor} rounded-full transition-all duration-1000 relative`}
               style={{ width: `${Math.min(100, progressPercentage)}%` }}
@@ -394,9 +394,9 @@ export default function TVDisplay() {
               )}
             </div>
           </div>
-          <div className="flex justify-between mt-3 text-lg md:text-xl">
-            <span className="text-slate-500 font-mono">{Math.round(progressPercentage)}%</span>
-            <span className="text-slate-500 font-mono">{line.takt_duration} min</span>
+          <div className="flex justify-between mt-4 text-2xl md:text-3xl font-bold">
+            <span className="text-slate-400 font-mono">{Math.round(progressPercentage)}%</span>
+            <span className="text-slate-400 font-mono">{line.takt_duration} min</span>
           </div>
         </div>
       </main>
@@ -407,14 +407,14 @@ export default function TVDisplay() {
         <div className="flex items-center gap-6">
           <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700">
             <div className="flex items-center gap-3 mb-2">
-              <Timer className="h-6 w-6 text-cyan-400" />
-              <span className="text-slate-400 uppercase tracking-wider text-sm">Takt</span>
+              <Timer className="h-8 w-8 text-cyan-400" />
+              <span className="text-slate-300 uppercase tracking-wider text-lg font-semibold">Takt</span>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-5xl md:text-6xl font-mono font-bold text-white" data-testid="tv-current-takt">
+              <span className="text-6xl md:text-7xl font-mono font-bold text-white" data-testid="tv-current-takt">
                 {currentTakt}
               </span>
-              <span className="text-2xl md:text-3xl font-mono text-slate-500">
+              <span className="text-3xl md:text-4xl font-mono text-slate-400 font-semibold">
                 / {estimatedTakts}
               </span>
             </div>
@@ -422,8 +422,8 @@ export default function TVDisplay() {
           
           {/* Remaining Takts */}
           <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700">
-            <p className="text-slate-400 uppercase tracking-wider text-sm mb-2">Restants</p>
-            <span className="text-5xl md:text-6xl font-mono font-bold text-cyan-400" data-testid="tv-remaining-takts">
+            <p className="text-slate-300 uppercase tracking-wider text-lg mb-2 font-semibold">Restants</p>
+            <span className="text-6xl md:text-7xl font-mono font-bold text-cyan-400" data-testid="tv-remaining-takts">
               {Math.max(0, estimatedTakts - currentTakt)}
             </span>
           </div>
@@ -433,10 +433,10 @@ export default function TVDisplay() {
         <div className="flex items-center gap-6">
           <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700">
             <div className="flex items-center gap-3 mb-2">
-              <Clock className="h-6 w-6 text-slate-400" />
-              <span className="text-slate-400 uppercase tracking-wider text-sm">Horaires</span>
+              <Clock className="h-8 w-8 text-slate-300" />
+              <span className="text-slate-300 uppercase tracking-wider text-lg font-semibold">Horaires</span>
             </div>
-            <div className="text-3xl md:text-4xl font-mono text-white">
+            <div className="text-4xl md:text-5xl font-mono text-white font-bold">
               {schedule.start} - {schedule.end}
             </div>
           </div>

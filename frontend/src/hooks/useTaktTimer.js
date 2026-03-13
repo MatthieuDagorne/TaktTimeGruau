@@ -241,13 +241,15 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
         return;
       }
 
-      // Check for break warning (X minutes before break end)
+      // Check for break warning (X minutes before break end) - only if enabled
       if (status === 'break') {
         const minutesBeforeBreakEnd = line?.sound_alerts?.minutes_before_break_end || 0;
+        const breakWarningEnabled = line?.sound_alerts?.break_warning_enabled ?? true;
         const breakWarningSeconds = minutesBeforeBreakEnd * 60;
         
-        // Trigger sound when exactly X minutes remain (with 1 second tolerance)
-        if (minutesBeforeBreakEnd > 0 && 
+        // Trigger sound when exactly X minutes remain (with 1 second tolerance) - only if enabled
+        if (breakWarningEnabled && 
+            minutesBeforeBreakEnd > 0 && 
             breakRemaining <= breakWarningSeconds && 
             breakRemaining > (breakWarningSeconds - 2)) {
           const breakWarningKey = `${state.current_break_name}_${breakWarningSeconds}`;
@@ -280,11 +282,13 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
 
       // Get warning threshold from settings (in seconds)
       const warningMinutes = line?.sound_alerts?.minutes_before_takt_end ?? 5;
+      const warningEnabled = line?.sound_alerts?.takt_warning_enabled ?? true;
       const warningThreshold = warningMinutes * 60;
 
-      // Check for warning (X minutes before end)
+      // Check for warning (X minutes before end) - only if enabled
       // Use a 10-second window to ensure we catch the threshold even with polling delays
       if (
+        warningEnabled &&
         remaining <= warningThreshold &&
         remaining > warningThreshold - 10 &&  // Within 10 seconds of threshold
         warningTriggeredForTakt.current !== currentTakt &&

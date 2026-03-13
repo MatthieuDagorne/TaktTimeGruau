@@ -831,6 +831,10 @@ async def start_takt(line_id: str):
     now = datetime.now(timezone.utc)
     paris_now = get_current_paris_time()
     
+    # PROTECTION: If already running, don't start a new takt
+    if current_status == 'running':
+        return {"message": "Line already running", "state": state}
+    
     # Get the active team based on current Paris time
     active_team = get_active_team_for_current_time(line)
     takt_duration = active_team.get('takt_duration', 30) if active_team else line.get('takt_duration', 30)
