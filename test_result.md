@@ -101,3 +101,69 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Bug fix - Le reliquat du takt de la période précédente au démarrage auto tourne en boucle"
+
+backend:
+  - task: "Fix infinite loop bug in auto-start with carryover"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: |
+          Bug identifié et corrigé. Le problème était une race condition où:
+          1. check_auto_start() retournait should_auto_start=True avec carryover
+          2. auto_start_takt() était appelé mais pouvait retourner tôt si status='running'
+          3. Le carryover n'était pas effacé dans ce cas, causant une boucle infinie
+          4. Plusieurs appels simultanés pouvaient lire l'ancien état avec carryover
+          
+          Corrections apportées:
+          1. Dans auto_start_takt(): Déplacé check_auto_start() AVANT la vérification du status
+          2. Ajout de logique pour effacer le carryover même si la ligne est déjà running
+          3. Ajout de l'effacement explicite du carryover dans TOUS les new_state:
+             - auto_start_takt() (cas normal et carryover)
+             - start_takt() (démarrage manuel et reprise)
+             - next_takt() (passage au takt suivant)
+             - stop_takt() (arrêt complet)
+          4. Cela garantit que le carryover est toujours nettoyé dès qu'il est utilisé ou qu'une nouvelle action démarre
+          
+          Fichiers modifiés:
+          - /app/backend/server.py (lignes 729-753, 787-801, 839-877, 1059-1069, 941-949)
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Fix infinite loop bug in auto-start with carryover"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Bug fix complet pour le problème de boucle infinie du carryover au démarrage auto.
+      
+      Le bug était causé par un carryover qui n'était pas effacé correctement, causant des appels
+      répétés à auto_start_takt() toutes les 30 secondes depuis le frontend.
+      
+      La solution garantit maintenant que:
+      1. Le carryover est vérifié AVANT de vérifier si la ligne est running
+      2. Le carryover est effacé même si la ligne est déjà running (pour stopper la boucle)
+      3. Le carryover est toujours inclus et mis à None dans tous les changements d'état
+      
+      Prêt pour les tests. Il faudrait tester:
+      1. Créer un carryover en terminant la journée avec un takt inachevé (endpoint /end-day)
+      2. Vérifier que check_auto_start retourne should_auto_start=True avec is_carryover=True
+      3. Appeler auto_start plusieurs fois et vérifier qu'il n'y a pas de boucle
+      4. Vérifier que le carryover est bien effacé après le premier auto_start
+      5. Vérifier que les appels suivants à check_auto_start ne retournent plus le carryover

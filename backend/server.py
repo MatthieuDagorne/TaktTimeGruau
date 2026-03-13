@@ -733,15 +733,24 @@ async def auto_start_takt(line_id: str):
     if not line:
         raise HTTPException(status_code=404, detail="Line not found")
     
-    # Check if line is already running - prevent duplicate starts
-    current_status = line.get('state', {}).get('status', 'idle')
-    if current_status == 'running':
-        return {"message": "Line already running", "state": line.get('state', {})}
-    
+    # First check auto-start conditions before checking status
     check_result = await check_auto_start(line_id)
     
     if not check_result.get('should_auto_start'):
         return {"message": "Auto-start not needed", "details": check_result}
+    
+    # Check if line is already running - prevent duplicate starts
+    # But still clear carryover if this was a carryover scenario
+    current_status = line.get('state', {}).get('status', 'idle')
+    if current_status == 'running':
+        # If this was a carryover scenario, clear the carryover to prevent loop
+        if check_result.get('is_carryover', False):
+            state = line.get('state', {})
+            state['carryover_takt'] = None
+            state['carryover_elapsed_seconds'] = None
+            state['carryover_date'] = None
+            await db.production_lines.update_one({"id": line_id}, {"$set": {"state": state}})
+        return {"message": "Line already running", "state": line.get('state', {})}
     
     expected_takt = check_result.get('expected_takt', 1)
     takt_duration = check_result.get('takt_duration', 30)
@@ -785,7 +794,11 @@ async def auto_start_takt(line_id: str):
             "current_takt": expected_takt,
             "takt_start_time": takt_start_time.isoformat(),
             "elapsed_seconds": elapsed_minutes * 60,
-            "paused_at": None
+            "paused_at": None,
+            # Clear any existing carryover (in case there was one that expired)
+            "carryover_takt": None,
+            "carryover_elapsed_seconds": None,
+            "carryover_date": None
         }
         
         await log_takt_event(
@@ -832,7 +845,11 @@ async def start_takt(line_id: str):
             "elapsed_seconds": state.get('elapsed_seconds', 0),  # Keep accumulated time
             "paused_at": None,
             "current_break_name": None,
-            "break_end_time": None
+            "break_end_time": None,
+            # Clear carryover when resuming
+            "carryover_takt": None,
+            "carryover_elapsed_seconds": None,
+            "carryover_date": None
         }
         await log_takt_event(line_id, line.get('site_id', ''), 'takt_resume', state.get('current_takt', 1))
     else:
@@ -842,7 +859,11 @@ async def start_takt(line_id: str):
             "current_takt": new_takt,
             "takt_start_time": now.isoformat(),
             "elapsed_seconds": 0,
-            "paused_at": None
+            "paused_at": None,
+            # Clear carryover when starting new takt manually
+            "carryover_takt": None,
+            "carryover_elapsed_seconds": None,
+            "carryover_date": None
         }
         await log_takt_event(
             line_id, line.get('site_id', ''), 'takt_start', new_takt,
@@ -922,7 +943,11 @@ async def stop_takt(line_id: str):
         "current_takt": 0,
         "takt_start_time": None,
         "elapsed_seconds": 0,
-        "paused_at": None
+        "paused_at": None,
+        # Clear carryover when stopping
+        "carryover_takt": None,
+        "carryover_elapsed_seconds": None,
+        "carryover_date": None
     }
     
     await db.production_lines.update_one({"id": line_id}, {"$set": {"state": new_state}})
@@ -1041,7 +1066,11 @@ async def next_takt(line_id: str):
         "current_takt": new_takt,
         "takt_start_time": now.isoformat(),
         "elapsed_seconds": 0,
-        "paused_at": None
+        "paused_at": None,
+        # Clear carryover when moving to next takt
+        "carryover_takt": None,
+        "carryover_elapsed_seconds": None,
+        "carryover_date": None
     }
     
     await log_takt_event(
