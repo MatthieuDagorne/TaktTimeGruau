@@ -1049,6 +1049,17 @@ async def next_takt(line_id: str):
     current_takt = state.get('current_takt', 0)
     now = datetime.now(timezone.utc)
     
+    # Protection: Don't allow next_takt if current takt just started (< 5 seconds)
+    if state.get('status') == 'running' and state.get('takt_start_time'):
+        takt_start = datetime.fromisoformat(state['takt_start_time'].replace('Z', '+00:00'))
+        elapsed_since_start = int((now - takt_start).total_seconds())
+        if elapsed_since_start < 5:
+            return {
+                "message": "Takt just started, wait a moment before advancing",
+                "state": state,
+                "elapsed_since_start": elapsed_since_start
+            }
+    
     # Log completion of current takt if running
     if state.get('status') == 'running' and state.get('takt_start_time'):
         takt_start = datetime.fromisoformat(state['takt_start_time'].replace('Z', '+00:00'))

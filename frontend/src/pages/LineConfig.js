@@ -56,6 +56,7 @@ import {
   Trash2,
   Check,
   AlertTriangle,
+  RotateCcw,
 } from 'lucide-react';
 
 // Utility functions for time validation
@@ -101,8 +102,8 @@ const validateTeam = (team) => {
     workDuration += 24 * 60; // Overnight shift
   }
   
-  if (workDuration < 60) {
-    errors.push("La durée de travail doit être d'au moins 1 heure");
+  if (workDuration < 10) {
+    errors.push("La durée de travail doit être d'au moins 10 minutes");
   }
   
   // Validate takt duration
@@ -523,6 +524,25 @@ export default function LineConfig() {
     }
   };
 
+  const handleResetTakt = async () => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/lines/${lineId}/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to reset takt');
+      }
+      
+      toast.success('Takt réinitialisé avec succès');
+      await loadLine();
+    } catch (err) {
+      console.error('Error resetting takt:', err);
+      toast.error('Erreur lors de la réinitialisation du takt');
+    }
+  };
+
   const setActiveTeam = (teamId) => {
     setFormData(prev => ({
       ...prev,
@@ -924,6 +944,45 @@ export default function LineConfig() {
               <Save className="h-5 w-5 mr-2" />
               {saving ? 'Enregistrement...' : 'Enregistrer'}
             </Button>
+
+            {/* Reset Takt Button - Only show for existing lines */}
+            {!isNew && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    className="w-full h-12 border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 hover:text-yellow-300 mt-3"
+                    data-testid="reset-takt-btn"
+                  >
+                    <RotateCcw className="h-5 w-5 mr-2" />
+                    Réinitialiser le takt
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-slate-800 border-slate-700">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-slate-100">
+                      Réinitialiser le takt en cours ?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-slate-400">
+                      Cette action va arrêter le takt en cours et remettre la ligne à zéro. Utilisez cette fonction pour abandonner un takt qui pose problème.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel className="border-slate-600 text-slate-300 hover:bg-slate-700">
+                      Annuler
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleResetTakt}
+                      className="bg-yellow-600 hover:bg-yellow-500 text-white"
+                      data-testid="confirm-reset-btn"
+                    >
+                      Réinitialiser
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
 
             {/* Delete Line Button - Only show for existing lines */}
             {!isNew && (

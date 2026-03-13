@@ -330,34 +330,34 @@ export default function TVDisplay() {
 
         {/* Break Display - shown when on break */}
         {status === 'break' && currentBreakName && (
-          <div className="w-full max-w-4xl mb-4 p-6 md:p-8 rounded-3xl bg-orange-500/20 border-2 border-orange-400" data-testid="tv-break-display">
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div className="flex items-center gap-3">
-                <Coffee className="h-6 w-6 md:h-8 md:w-8 text-orange-400" />
-                <span className="text-lg md:text-2xl text-orange-400 font-bold uppercase tracking-wider">{currentBreakName}</span>
+          <div className="w-full max-w-4xl mb-3 p-4 md:p-6 rounded-3xl bg-orange-500/20 border-2 border-orange-400" data-testid="tv-break-display">
+            <div className="flex flex-col items-center justify-center gap-1">
+              <div className="flex items-center gap-2">
+                <Coffee className="h-5 w-5 md:h-6 md:w-6 text-orange-400" />
+                <span className="text-base md:text-xl text-orange-400 font-bold uppercase tracking-wider">{currentBreakName}</span>
               </div>
-              <div className="text-[8vw] md:text-[10vw] lg:text-[8vw] font-mono font-bold text-orange-400 leading-none py-2" data-testid="tv-break-countdown">
+              <div className="text-[6vw] md:text-[8vw] lg:text-[6vw] font-mono font-bold text-orange-400 leading-none py-1" data-testid="tv-break-countdown">
                 {breakRemainingFormatted}
               </div>
-              <p className="text-base md:text-lg text-orange-400/80">Temps de pause restant</p>
+              <p className="text-sm md:text-base text-orange-400/80">Temps de pause restant</p>
             </div>
           </div>
         )}
 
         {/* Stop Time Display - shown when paused or idle (with paused_at) */}
         {(status === 'paused' || status === 'idle') && stopTimeSeconds > 0 && (
-          <div className="w-full max-w-4xl mb-4 p-6 md:p-8 rounded-3xl bg-red-500/20 border-2 border-red-400" data-testid="tv-stop-time-display">
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div className="flex items-center gap-3">
-                <Pause className="h-6 w-6 md:h-8 md:w-8 text-red-400" />
-                <span className="text-lg md:text-2xl text-red-400 font-bold uppercase tracking-wider">
+          <div className="w-full max-w-4xl mb-3 p-4 md:p-6 rounded-3xl bg-red-500/20 border-2 border-red-400" data-testid="tv-stop-time-display">
+            <div className="flex flex-col items-center justify-center gap-1">
+              <div className="flex items-center gap-2">
+                <Pause className="h-5 w-5 md:h-6 md:w-6 text-red-400" />
+                <span className="text-base md:text-xl text-red-400 font-bold uppercase tracking-wider">
                   {status === 'paused' ? 'LIGNE SUSPENDUE' : 'LIGNE ARRÊTÉE'}
                 </span>
               </div>
-              <div className="text-[8vw] md:text-[10vw] lg:text-[8vw] font-mono font-bold text-red-400 leading-none py-2" data-testid="tv-stop-time-counter">
+              <div className="text-[6vw] md:text-[8vw] lg:text-[6vw] font-mono font-bold text-red-400 leading-none py-1" data-testid="tv-stop-time-counter">
                 {stopTimeFormatted}
               </div>
-              <p className="text-base md:text-lg text-red-400/80">Temps d'arrêt</p>
+              <p className="text-sm md:text-base text-red-400/80">Temps d'arrêt</p>
             </div>
           </div>
         )}
