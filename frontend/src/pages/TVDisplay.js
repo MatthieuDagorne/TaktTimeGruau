@@ -11,8 +11,6 @@ import {
   Coffee,
   Play,
   Pause,
-  Volume2,
-  VolumeX,
   SkipForward,
   Square,
   AlertCircle,
@@ -47,28 +45,30 @@ export default function TVDisplay() {
   const { fetchLine, connectWebSocket, disconnectWebSocket, enableAudio, playSound, startTakt, pauseTakt, nextTakt, checkAutoStart, autoStartTakt, startBreak, endDay } = useTakt();
   const [line, setLine] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [audioEnabled, setAudioEnabled] = useState(false);
   const [showControls, setShowControls] = useState(false);
   const controlsTimeout = useRef(null);
+
+  // Audio is always enabled on TV display
+  const audioEnabled = true;
 
   // Check if auto-start is enabled
   const autoStartEnabled = line?.auto_start_at_day_begin ?? false;
 
   const handleWarning = useCallback(() => {
-    // Play warning sound if audio is enabled and warning minutes is configured
-    if (audioEnabled && line?.sound_alerts?.minutes_before_takt_end > 0) {
+    // Play warning sound if warning minutes is configured
+    if (line?.sound_alerts?.minutes_before_takt_end > 0) {
       console.log('[TVDisplay] Playing takt warning sound');
       playSound('takt_warning');
     }
-  }, [audioEnabled, line, playSound]);
+  }, [line, playSound]);
 
   const handleComplete = useCallback(() => {
-    // Play end sound if audio is enabled and takt_end is true
-    if (audioEnabled && line?.sound_alerts?.takt_end) {
+    // Play end sound if takt_end is true
+    if (line?.sound_alerts?.takt_end) {
       console.log('[TVDisplay] Playing takt end sound');
       playSound('takt_end');
     }
-  }, [audioEnabled, line, playSound]);
+  }, [line, playSound]);
 
   const handleAutoNext = useCallback(async () => {
     if (line?.auto_resume_after_takt) {
@@ -84,7 +84,6 @@ export default function TVDisplay() {
   const handleBreakStart = useCallback(async (breakName, breakDuration) => {
     try {
       enableAudio();
-      setAudioEnabled(true);
       await startBreak(lineId, breakName, breakDuration);
       await loadLine();
     } catch (err) {
@@ -106,7 +105,6 @@ export default function TVDisplay() {
     try {
       console.log('[TVDisplay] Auto-resume after break triggered');
       enableAudio();
-      setAudioEnabled(true);
       await startTakt(lineId);
       await loadLine();
     } catch (err) {
@@ -159,6 +157,9 @@ export default function TVDisplay() {
 
   useEffect(() => {
     loadLine();
+    
+    // Enable audio automatically on TV display
+    enableAudio();
     
     // Connect to WebSocket for real-time updates
     const ws = connectWebSocket(lineId, (data) => {
@@ -330,34 +331,34 @@ export default function TVDisplay() {
 
         {/* Break Display - shown when on break */}
         {status === 'break' && currentBreakName && (
-          <div className="w-full max-w-4xl mb-3 p-4 md:p-6 rounded-3xl bg-orange-500/20 border-2 border-orange-400" data-testid="tv-break-display">
+          <div className="w-full max-w-4xl mb-2 p-3 md:p-4 rounded-2xl bg-orange-500/20 border-2 border-orange-400" data-testid="tv-break-display">
             <div className="flex flex-col items-center justify-center gap-1">
               <div className="flex items-center gap-2">
-                <Coffee className="h-5 w-5 md:h-6 md:w-6 text-orange-400" />
-                <span className="text-base md:text-xl text-orange-400 font-bold uppercase tracking-wider">{currentBreakName}</span>
+                <Coffee className="h-4 w-4 md:h-5 md:w-5 text-orange-400" />
+                <span className="text-sm md:text-lg text-orange-400 font-bold uppercase tracking-wider">{currentBreakName}</span>
               </div>
-              <div className="text-[6vw] md:text-[8vw] lg:text-[6vw] font-mono font-bold text-orange-400 leading-none py-1" data-testid="tv-break-countdown">
+              <div className="text-[5vw] md:text-[6vw] lg:text-[5vw] font-mono font-bold text-orange-400 leading-none" data-testid="tv-break-countdown">
                 {breakRemainingFormatted}
               </div>
-              <p className="text-sm md:text-base text-orange-400/80">Temps de pause restant</p>
+              <p className="text-xs md:text-sm text-orange-400/80">Temps de pause restant</p>
             </div>
           </div>
         )}
 
         {/* Stop Time Display - shown when paused or idle (with paused_at) */}
         {(status === 'paused' || status === 'idle') && stopTimeSeconds > 0 && (
-          <div className="w-full max-w-4xl mb-3 p-4 md:p-6 rounded-3xl bg-red-500/20 border-2 border-red-400" data-testid="tv-stop-time-display">
+          <div className="w-full max-w-4xl mb-2 p-3 md:p-4 rounded-2xl bg-red-500/20 border-2 border-red-400" data-testid="tv-stop-time-display">
             <div className="flex flex-col items-center justify-center gap-1">
               <div className="flex items-center gap-2">
-                <Pause className="h-5 w-5 md:h-6 md:w-6 text-red-400" />
-                <span className="text-base md:text-xl text-red-400 font-bold uppercase tracking-wider">
+                <Pause className="h-4 w-4 md:h-5 md:w-5 text-red-400" />
+                <span className="text-sm md:text-lg text-red-400 font-bold uppercase tracking-wider">
                   {status === 'paused' ? 'LIGNE SUSPENDUE' : 'LIGNE ARRÊTÉE'}
                 </span>
               </div>
-              <div className="text-[6vw] md:text-[8vw] lg:text-[6vw] font-mono font-bold text-red-400 leading-none py-1" data-testid="tv-stop-time-counter">
+              <div className="text-[5vw] md:text-[6vw] lg:text-[5vw] font-mono font-bold text-red-400 leading-none" data-testid="tv-stop-time-counter">
                 {stopTimeFormatted}
               </div>
-              <p className="text-sm md:text-base text-red-400/80">Temps d'arrêt</p>
+              <p className="text-xs md:text-sm text-red-400/80">Temps d'arrêt</p>
             </div>
           </div>
         )}
@@ -439,23 +440,6 @@ export default function TVDisplay() {
               {schedule.start} - {schedule.end}
             </div>
           </div>
-
-          {/* Audio Toggle */}
-          <button
-            onClick={audioEnabled ? () => setAudioEnabled(false) : handleEnableAudio}
-            className={`p-4 rounded-xl border transition-all ${
-              audioEnabled 
-                ? 'bg-green-500/20 border-green-500/50 text-green-400' 
-                : 'bg-slate-800/50 border-slate-700 text-slate-500 hover:border-slate-600'
-            }`}
-            data-testid="audio-toggle"
-          >
-            {audioEnabled ? (
-              <Volume2 className="h-8 w-8" />
-            ) : (
-              <VolumeX className="h-8 w-8" />
-            )}
-          </button>
         </div>
       </footer>
 
@@ -534,25 +518,6 @@ export default function TVDisplay() {
           </Button>
         )}
       </div>
-
-      {/* Audio Enable Overlay */}
-      {!audioEnabled && status === 'idle' && (
-        <div 
-          className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 cursor-pointer"
-          onClick={handleEnableAudio}
-          data-testid="audio-enable-overlay"
-        >
-          <div className="text-center p-12 rounded-3xl bg-slate-800/90 border border-slate-700 max-w-lg">
-            <Volume2 className="h-20 w-20 text-blue-400 mx-auto mb-6" />
-            <h2 className="text-3xl font-heading font-bold text-white mb-4">
-              Cliquez pour activer le son
-            </h2>
-            <p className="text-slate-400 text-lg">
-              Les navigateurs bloquent l'audio automatique. Cliquez n'importe où pour activer les alertes sonores.
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

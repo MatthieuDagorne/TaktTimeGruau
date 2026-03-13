@@ -629,27 +629,26 @@ async def check_auto_start(line_id: str):
         current_minutes = time_to_minutes(current_time_str)
         today_date = now_local.strftime('%Y-%m-%d')
         
-        # Check for carryover from previous day (within first 5 minutes of day start)
+        # Check for carryover from incomplete takt (within first 5 minutes of day start)
         carryover_takt = state.get('carryover_takt')
         carryover_elapsed = state.get('carryover_elapsed_seconds', 0)
         carryover_date = state.get('carryover_date')
         
         # Use carryover if:
         # 1. There's a carryover saved
-        # 2. Carryover is from yesterday or earlier (not today)
-        # 3. We're within the first 5 minutes of day start
+        # 2. We're within the first 5 minutes of day start
+        # Note: Removed the "carryover_date != today_date" condition to allow carryover same day
         minutes_since_start = current_minutes - start_minutes if current_minutes >= start_minutes else 0
         use_carryover = (
             carryover_takt is not None and 
             carryover_date is not None and 
-            carryover_date != today_date and
             minutes_since_start <= 5
         )
         
         if use_carryover:
             return {
                 "should_auto_start": True,
-                "reason": "Carryover from previous day",
+                "reason": "Carryover from incomplete takt",
                 "current_time": current_time_str,
                 "timezone": site_tz_str,
                 "day_start": day_start,

@@ -6,6 +6,9 @@ class IndustrialSoundManager {
     this.audioContext = null;
     this.enabled = false;
     this.masterGain = null;
+    this.lastPlayedSound = null;
+    this.lastPlayedTime = 0;
+    this.soundDebounceMs = 500; // Minimum 500ms between sounds
   }
 
   init() {
@@ -178,8 +181,21 @@ class IndustrialSoundManager {
     this.createTone(800, 0.2, 'sine', 0.4);
   }
 
-  // Play sound by type
+  // Play sound by type with debounce to avoid overlapping sounds
   play(type) {
+    const now = Date.now();
+    const timeSinceLastSound = now - this.lastPlayedTime;
+    
+    // If a sound was played recently (within debounce period), skip this one
+    if (timeSinceLastSound < this.soundDebounceMs) {
+      console.log(`[Sound] Debounced ${type} (${timeSinceLastSound}ms since last sound)`);
+      return;
+    }
+    
+    // Update last played tracking
+    this.lastPlayedSound = type;
+    this.lastPlayedTime = now;
+    
     switch (type) {
       case 'takt_start':
         this.playTaktStart();

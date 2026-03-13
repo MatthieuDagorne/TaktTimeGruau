@@ -241,6 +241,28 @@ export const useTaktTimer = (line, onWarning, onComplete, onAutoNext, onBreakSta
         return;
       }
 
+      // Check for break warning (X minutes before break end)
+      if (status === 'break') {
+        const minutesBeforeBreakEnd = line?.sound_alerts?.minutes_before_break_end || 0;
+        const breakWarningSeconds = minutesBeforeBreakEnd * 60;
+        
+        // Trigger sound when exactly X minutes remain (with 1 second tolerance)
+        if (minutesBeforeBreakEnd > 0 && 
+            breakRemaining <= breakWarningSeconds && 
+            breakRemaining > (breakWarningSeconds - 2)) {
+          const breakWarningKey = `${state.current_break_name}_${breakWarningSeconds}`;
+          if (!breakTriggeredRef.current[breakWarningKey]) {
+            breakTriggeredRef.current[breakWarningKey] = true;
+            console.log(`[TIMER] Break warning: ${minutesBeforeBreakEnd} min before end`);
+            // Import and use playSound from context
+            if (typeof window !== 'undefined' && window.soundManager) {
+              window.soundManager.play('break_warning');
+            }
+          }
+        }
+        return; // Don't process other alerts during break
+      }
+
       // Only process other alerts when running
       if (status !== 'running') return;
 
